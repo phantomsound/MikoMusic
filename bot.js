@@ -91,10 +91,12 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            await player.extractors.loadDefault();
+            // THE FIX: Officially using loadMulti with DefaultExtractors
+            const { DefaultExtractors } = require('@discord-player/extractor');
+            await player.extractors.loadMulti(DefaultExtractors);
             console.log(`✅ Extractors Active: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
         } catch (e) {
-            console.error("❌ Extractor Load Error:", e);
+            console.error("❌ Extractor Load Error:", e.message);
         }
         
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
