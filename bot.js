@@ -1,8 +1,9 @@
 ﻿// MUST BE LINE 1: Forces the native engine to route audio streams through the 403-bypass module
-process.env.DP_FORCE_YTDL_MOD = '@distube/ytdl-core';
+process.env.DP_FORCE_YTDL_MOD = 'play-dl';
 
 const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
 const { Player, QueueRepeatMode } = require('discord-player');
+const { SpotifyExtractor, AppleMusicExtractor, YouTubeExtractor, SoundCloudExtractor } = require('@discord-player/extractor');
 const fs = require('fs');
 
 function getConfig() {
@@ -93,16 +94,15 @@ function startBot() {
     player.events.on('volumeChange', (queue) => updatePanel(queue));
 
     client.once('clientReady', async () => {
-        try {
-            // Unrestricted native load ensures ALL modules (Spotify, Apple, YouTube, SoundCloud) boot perfectly.
-            await player.extractors.loadDefault();
-            console.log(`✅ Pristine Extractors Loaded. Audio Engine: @distube/ytdl-core`);
-        } catch (e) {
-            console.error("Extractor Setup Warning:", e.message);
-        }
-        
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
         await ensureStandbyBanner(client);
+
+        // ISOLATED EXTRACTOR REGISTRATION
+        // If one fails, it throws a warning but allows the rest of the bot to function normally.
+        try { await player.extractors.register(YouTubeExtractor, { useClient: 'play-dl' }); console.log('✅ YouTube Extractor + play-dl registered'); } catch(e) { console.error('❌ YT Error:', e.message); }
+        try { await player.extractors.register(SpotifyExtractor, {}); console.log('✅ Spotify Extractor registered'); } catch(e) { console.error('❌ Spotify Error:', e.message); }
+        try { await player.extractors.register(SoundCloudExtractor, {}); console.log('✅ SoundCloud Extractor registered'); } catch(e) { console.error('❌ SC Error:', e.message); }
+        try { await player.extractors.register(AppleMusicExtractor, {}); console.log('✅ Apple Music Extractor registered'); } catch(e) { console.error('❌ Apple Error:', e.message); }
 
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
         const cmds = [
