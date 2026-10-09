@@ -1,7 +1,5 @@
 ﻿const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
 const { Player, QueueRepeatMode } = require('discord-player');
-
-// 1. Explicitly import the extractors so dynamic loading is bypassed
 const { SpotifyExtractor, AppleMusicExtractor, YouTubeExtractor, SoundCloudExtractor } = require('@discord-player/extractor');
 const fs = require('fs');
 
@@ -63,13 +61,17 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            // 2. Manually register every single extractor
-            await player.extractors.register(SpotifyExtractor, {});
-            await player.extractors.register(AppleMusicExtractor, {});
-            await player.extractors.register(YouTubeExtractor, {});
+            // 1. Register SoundCloud FIRST so it can act as the core audio bridge
             await player.extractors.register(SoundCloudExtractor, {});
             
-            console.log(`✅ Static Extractors Successfully Hard-Wired: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
+            // 2. Force Spotify and Apple Music to completely bypass YouTube and pull audio streams directly from SoundCloud
+            await player.extractors.register(SpotifyExtractor, { bridgeProvider: SoundCloudExtractor });
+            await player.extractors.register(AppleMusicExtractor, { bridgeProvider: SoundCloudExtractor });
+            
+            // 3. Register YouTube last (only used if someone explicitly queues a direct YT link)
+            await player.extractors.register(YouTubeExtractor, {});
+            
+            console.log(`✅ SoundCloud Bridges Hard-Wired: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
         } catch (e) { 
             console.error("❌ Extractor Manual Load Error:", e); 
         }
