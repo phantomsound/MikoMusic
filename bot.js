@@ -59,12 +59,14 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            const { YoutubeiExtractor } = require('discord-player-youtubei');
-            await player.extractors.register(YoutubeiExtractor, {});
-            await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
-        } catch (e) {
-            await player.extractors.loadDefault();
-        }
+            // Deploy the play-dl client bypass to evade YouTube's 403 Forbidden blocks
+            await player.extractors.loadDefault({
+                youtube: {
+                    useClient: 'play-dl'
+                }
+            });
+        } catch (e) { console.error("Extractor Load Error:", e); }
+        
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
         
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
@@ -83,33 +85,15 @@ function startBot() {
             const cleanQuery = rawQuery.toLowerCase().trim();
             const matchedMacro = playlists.find(pl => pl.shortcode && pl.shortcode.toLowerCase() === cleanQuery);
             let safeQuery = matchedMacro ? matchedMacro.url : rawQuery;
-            let searchEngine = 'auto';
             
-            // Aggressively sanitize YouTube URLs to bypass scraper blocks
-            if (safeQuery.includes('youtube.com') || safeQuery.includes('youtu.be')) {
-                try {
-                    const u = new URL(safeQuery.replace('music.youtube.com', 'www.youtube.com'));
-                    const listId = u.searchParams.get('list');
-                    const videoId = u.searchParams.get('v');
-                    if (listId) {
-                        safeQuery = `https://www.youtube.com/playlist?list=${listId}`;
-                        searchEngine = 'youtubePlaylist';
-                    } else if (videoId) {
-                        safeQuery = `https://www.youtube.com/watch?v=${videoId}`;
-                        searchEngine = 'youtubeVideo';
-                    }
-                } catch(e) {}
+            if (safeQuery.includes('music.youtube.com')) {
+                safeQuery = safeQuery.replace('music.youtube.com', 'www.youtube.com');
             }
             
-            let result = await player.search(safeQuery, { requestedBy: interaction.user, searchEngine: searchEngine });
-            
-            // Fallback to auto-detection if explicit engine fails
-            if (!result || !result.hasTracks()) {
-                result = await player.search(safeQuery, { requestedBy: interaction.user });
-            }
+            const result = await player.search(safeQuery, { requestedBy: interaction.user });
             
             if (!result || !result.hasTracks()) {
-                return interaction.followUp(`❌ No tracks found for: ${safeQuery}\n*(If this is a playlist, ensure it is set to Unlisted/Public)*`);
+                return interaction.followUp(`❌ No tracks found for: ${safeQuery}\n*(YouTube may be rate-limiting this specific query)*`);
             }
             
             const queue = player.nodes.create(interaction.guild, { metadata: { channel: interaction.channel, panelMessage: null }, leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false });
