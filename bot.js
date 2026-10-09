@@ -91,12 +91,17 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            // THE FIX: Officially using loadMulti with DefaultExtractors
-            const { DefaultExtractors } = require('@discord-player/extractor');
+            const { DefaultExtractors, YouTubeExtractor } = require('@discord-player/extractor');
+            
+            // THE FIX: Explicitly register YouTube Extractor FIRST so Spotify can bridge to it
+            await player.extractors.register(YouTubeExtractor, {});
+            
+            // Then load all the other default extractors
             await player.extractors.loadMulti(DefaultExtractors);
+            
             console.log(`✅ Extractors Active: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
         } catch (e) {
-            console.error("❌ Extractor Load Error:", e.message);
+            console.error("❌ Extractor Load Error:", e.stack);
         }
         
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
