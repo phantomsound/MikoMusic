@@ -1,9 +1,9 @@
-﻿// MUST BE LINE 1: Forces the native YouTube Extractor to use the official bypass engine to avoid 403 skips
-process.env.DP_FORCE_YTDL_MOD = 'youtube-ext';
+﻿process.env.DP_FORCE_YTDL_MOD = 'youtube-ext';
 
 const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
 const { Player, QueueRepeatMode } = require('discord-player');
 const fs = require('fs');
+const logger = require('./logger');
 
 function getConfig() {
     try { return JSON.parse(fs.readFileSync('./config.json', 'utf-8')); } catch (e) { return {}; }
@@ -75,34 +75,26 @@ function startBot() {
     const player = new Player(client);
     client.player = player;
     
-    // Explicit debug listeners so we never get a silent error again
+    logger.initLogger(client);
+
     player.events.on('error', (q, e) => console.log('❌ Player Error:', e.message));
     player.events.on('playerError', (q, e) => console.log('❌ Stream Blocked (403):', e.message));
     player.events.on('playerSkip', (q, track) => console.log(`⚠️ Skipped Track: ${track.title}`));
-    
-    // Core Extractor & Bridge Debugging
-    player.events.on('debug', (q, m) => {
-        if (m.includes('Extractor') || m.includes('Bridge') || m.includes('youtube')) {
-            console.log('🔍 [DEBUG]', m);
-        }
-    });
     
     player.events.on('playerStart', (queue, track) => { logNowPlaying(queue.guild, track); updatePanel(queue); });
     player.events.on('audioTrackAdd', (queue) => updatePanel(queue));
     player.events.on('audioTracksAdd', (queue) => updatePanel(queue));
     player.events.on('audioTrackRemove', (queue) => updatePanel(queue));
-    player.events.on('emptyQueue', (queue) => updatePanel(queue));
-    player.events.on('disconnect', (queue) => updatePanel(queue));
+    player.events.on('emptyQueue', (queue) => { updatePanel(queue); logger.checkDeferredRotation(); });
+    player.events.on('disconnect', (queue) => { updatePanel(queue); logger.checkDeferredRotation(); });
     player.events.on('volumeChange', (queue) => updatePanel(queue));
 
     client.once('clientReady', async () => {
         try {
-            // Natively loads ALL official extractors perfectly without hacky try/catch blocks
             await player.extractors.loadDefault();
-            console.log(`✅ All Extractors Online: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
-            console.log(`✅ Forced Audio Bridge Engine: ${process.env.DP_FORCE_YTDL_MOD}`);
+            console.log(`✅ Extractors Active: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
         } catch (e) {
-            console.error("❌ FATAL EXTRACTOR BOOT ERROR:", e);
+            console.error("❌ Extractor Load Error:", e);
         }
         
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);

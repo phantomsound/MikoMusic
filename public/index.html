@@ -40,6 +40,8 @@
 
         .move-box { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.8rem; background: var(--input); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border); }
         .move-box input { width: 75px; text-align: center; }
+
+        .terminal-box { background: #11111b; border: 1px solid var(--border); border-radius: 6px; padding: 0.8rem; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.82rem; height: 180px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #a6e3a1; margin-top: 0.6rem; }
     </style>
 </head>
 <body>
@@ -119,6 +121,35 @@
             </div>
         </div>
     </div>
+
+    <!-- LOGS & RETENTION CARD -->
+    <div class="card full" style="border-left: 4px solid var(--green);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem;">
+            <div>
+                <h3 style="margin: 0;">🖥️ System Diagnostics & Log Management</h3>
+                <span class="help-text" style="margin: 0;">Auto-rotates and archives logs. Defers rotation while bot is actively in a voice channel.</span>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button onclick="window.open('/api/logs/export')" class="btn-secondary">📥 Export Log (.txt)</button>
+                <button onclick="fetchLogs()" class="btn-secondary">🔄 Refresh</button>
+            </div>
+        </div>
+
+        <div class="terminal-box" id="terminalBox">Loading service logs...</div>
+
+        <div style="display: flex; gap: 15px; margin-top: 1rem; align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="font-size: 0.88rem; font-weight: 600;">Log Retention:</label>
+                <select id="logRetentionDays" style="width: 140px;">
+                    <option value="3">3 Days</option>
+                    <option value="7">7 Days (Default)</option>
+                    <option value="14">14 Days</option>
+                    <option value="30">30 Days</option>
+                </select>
+            </div>
+            <button onclick="saveLogRetention()" class="btn-success" style="padding: 0.65rem 1rem;">💾 Save Retention</button>
+        </div>
+    </div>
     
     <div class="card full" style="margin-top: 1.5rem;">
         <h3>Playlist Manager & Hot-Load Macros</h3>
@@ -158,6 +189,7 @@
                     if (data.dashboardName) document.getElementById('dashTitle').innerText = data.dashboardName;
                     if (data.panelChannelId) panel.value = data.panelChannelId;
                     if (data.logChannelId) log.value = data.logChannelId;
+                    if (data.logRetentionDays) document.getElementById('logRetentionDays').value = data.logRetentionDays;
                     cachedPlaylists = data.savedPlaylists || [];
                     renderPlaylists();
                 });
@@ -171,6 +203,24 @@
                 });
             });
             refreshQueue();
+            fetchLogs();
+        }
+
+        function fetchLogs() {
+            fetch('/api/logs').then(r => r.json()).then(data => {
+                const box = document.getElementById('terminalBox');
+                box.innerText = data.logs || "Log file is currently empty.";
+                box.scrollTop = box.scrollHeight;
+            });
+        }
+
+        function saveLogRetention() {
+            const days = parseInt(document.getElementById('logRetentionDays').value);
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ logRetentionDays: days })
+            }).then(() => alert(`Log retention set to ${days} days!`));
         }
 
         function refreshQueue() {
@@ -240,6 +290,7 @@
         }
 
         setInterval(refreshQueue, 3500);
+        setInterval(fetchLogs, 5000); // Live poll logs every 5s
 
         function editDashName() {
             const newName = prompt("Enter new dashboard name:", document.getElementById('dashTitle').innerText);
@@ -267,7 +318,7 @@
             fetch('/api/play', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) })
             .then(r => r.json()).then(res => {
                 if (!res.success) alert(res.message);
-                else { document.getElementById('remotePlayInput').value = ''; refreshQueue(); }
+                else { document.getElementById('remotePlayInput').value = ''; refreshQueue(); fetchLogs(); }
             });
         }
 
@@ -328,7 +379,7 @@
 
         function controlPlayer(action) {
             fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
-            .then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); });
+            .then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); fetchLogs(); });
         }
 
         loadConfig();

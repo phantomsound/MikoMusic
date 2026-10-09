@@ -1,6 +1,8 @@
 ﻿const express = require('express');
 const fs = require('fs');
+const path = require('path');
 const { QueueRepeatMode } = require('discord-player');
+const logger = require('./logger');
 const app = express();
 
 process.on('unhandledRejection', error => console.error('Unhandled Rejection:', error));
@@ -16,7 +18,6 @@ function updateConfig(newValues) {
     fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
 }
 
-// Dynamically tracks the active server where the music is playing to prevent dashboard UI desyncs
 function getActiveGuild(discordClient) {
     const activeNode = discordClient.player?.nodes?.cache?.first();
     if (activeNode) return activeNode.guild;
@@ -27,8 +28,8 @@ function startServer(discordClient) {
     app.get('/api/config', (req, res) => {
         try {
             const config = JSON.parse(fs.readFileSync('./config.json', 'utf-8'));
-            res.json({ ...config, clientId: process.env.CLIENT_ID });
-        } catch (e) { res.json({ clientId: process.env.CLIENT_ID, savedPlaylists: [] }); }
+            res.json({ logRetentionDays: 7, ...config, clientId: process.env.CLIENT_ID });
+        } catch (e) { res.json({ logRetentionDays: 7, clientId: process.env.CLIENT_ID, savedPlaylists: [] }); }
     });
 
     app.get('/api/server-info', (req, res) => {
@@ -63,6 +64,28 @@ function startServer(discordClient) {
                 volume: queue.node.volume
             });
         } catch (e) { res.json({ current: null, tracks: [], volume: 100 }); }
+    });
+
+    // --- LOGGING & EXPORT APIS ---
+    app.get('/api/logs', (req, res) => {
+        res.setHeader('Cache-Control', 'no-store');
+        const logPath = logger.getLogFile();
+        if (!fs.existsSync(logPath)) return res.json({ logs: "No log entries found yet." });
+        try {
+            const content = fs.readFileSync(logPath, 'utf8');
+            const lines = content.trim().split('\n');
+            const tail = lines.slice(-100).join('\n'); // Return last 100 lines
+            res.json({ logs: tail });
+        } catch(e) {
+            res.json({ logs: `Error reading logs: ${e.message}` });
+        }
+    });
+
+    app.get('/api/logs/export', (req, res) => {
+        const logPath = logger.getLogFile();
+        if (!fs.existsSync(logPath)) return res.status(404).send("No log file found.");
+        const downloadName = `MikoMusic-Log-${new Date().toISOString().slice(0, 10)}.txt`;
+        res.download(logPath, downloadName);
     });
 
     app.post('/api/settings', (req, res) => {
