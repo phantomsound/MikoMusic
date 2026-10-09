@@ -1,0 +1,14 @@
+﻿version: '3.8'
+services:
+  miko-music-bot:
+    build: .
+    container_name: miko_discord_music
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - CLIENT_ID=${CLIENT_ID}
+      - PORT=3000
+    volumes:
+      - ./config.json:/usr/src/app/config.json

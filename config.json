@@ -1,0 +1,14 @@
+﻿{
+  "botName": "Miko Music",
+  "adminRoles": [],
+  "savedPlaylists": [
+    {
+      "name": "Friday Night Gamers",
+      "url": "https://music.youtube.com/playlist?list=PL..." 
+    },
+    {
+      "name": "DOWNTEMPO GROOVE",
+      "url": "https://music.youtube.com/playlist?list=PL..."
+    }
+  ]
+}
