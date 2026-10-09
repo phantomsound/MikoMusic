@@ -1,13 +1,10 @@
-﻿const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
-const { Player, QueueRepeatMode } = require('discord-player');
-const { SpotifyExtractor, AppleMusicExtractor, SoundCloudExtractor } = require('@discord-player/extractor');
-const fs = require('fs');
+﻿// MUST BE LINE 1: Forces the native engine to route audio streams through the 403-bypass module
+process.env.DP_FORCE_YTDL_MOD = '@distube/ytdl-core';
 
-let YoutubeiExtractor;
-try {
-    const ytPkg = require('discord-player-youtubei');
-    YoutubeiExtractor = ytPkg.YoutubeiExtractor || ytPkg.default || ytPkg;
-} catch (e) {}
+const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
+const { Player, QueueRepeatMode } = require('discord-player');
+const { DefaultExtractors } = require('@discord-player/extractor');
+const fs = require('fs');
 
 function getConfig() {
     try { return JSON.parse(fs.readFileSync('./config.json', 'utf-8')); } catch (e) { return {}; }
@@ -76,7 +73,14 @@ async function ensureStandbyBanner(client) {
 
 function startBot() {
     const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
-    const player = new Player(client);
+    
+    // Initialize Player with resilient YTDL settings to prevent skips
+    const player = new Player(client, {
+        ytdlOptions: {
+            quality: 'highestaudio',
+            highWaterMark: 1 << 25
+        }
+    });
     client.player = player;
     
     player.events.on('error', (q, e) => console.log('Player Error:', e.message));
@@ -91,13 +95,9 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            if (YoutubeiExtractor && typeof YoutubeiExtractor === 'function') {
-                await player.extractors.register(YoutubeiExtractor, {});
-            }
-            await player.extractors.register(SpotifyExtractor, {});
-            await player.extractors.register(AppleMusicExtractor, {});
-            await player.extractors.register(SoundCloudExtractor, {});
-            console.log(`✅ Extractors Active: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
+            // Pristine, unrestricted native extractor load
+            await player.extractors.loadMulti(DefaultExtractors);
+            console.log(`✅ Pristine Extractors Loaded. Audio Engine: @distube/ytdl-core`);
         } catch (e) {
             console.error("Extractor Setup Warning:", e.message);
         }
@@ -123,7 +123,6 @@ function startBot() {
         
         if (!queue.connection) await queue.connect(channel);
 
-        // Cleanup old panel to prevent chat spam
         if (queue.metadata.panelMessage && queue.metadata.panelMessage.id) {
             try { await queue.metadata.panelMessage.delete(); } catch(e) {}
         }
