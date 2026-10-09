@@ -13,7 +13,6 @@ function startServer(discordClient) {
         res.json({ ...config, clientId: process.env.CLIENT_ID });
     });
 
-    // Fetch Discord Channels for Dropdowns
     app.get('/api/channels', (req, res) => {
         const guild = discordClient.guilds.cache.first();
         if (!guild) return res.json([]);
@@ -21,7 +20,6 @@ function startServer(discordClient) {
         res.json(channels);
     });
 
-    // Fetch Live Queue Data
     app.get('/api/queue', (req, res) => {
         const queue = discordClient.player?.nodes?.cache?.first();
         if (!queue) return res.json({ current: null, tracks: [] });
@@ -31,7 +29,6 @@ function startServer(discordClient) {
         });
     });
 
-    // Update Channel Config
     app.post('/api/update-channels', (req, res) => {
         const { panelChannelId, logChannelId } = req.body;
         const config = JSON.parse(fs.readFileSync('./config.json', 'utf-8'));
@@ -41,7 +38,6 @@ function startServer(discordClient) {
         res.json({ success: true });
     });
 
-    // Full Array Replacement for Playlist Editing
     app.post('/api/playlists', (req, res) => {
         const config = JSON.parse(fs.readFileSync('./config.json', 'utf-8'));
         config.savedPlaylists = req.body.playlists;
@@ -49,7 +45,6 @@ function startServer(discordClient) {
         res.json({ success: true });
     });
 
-    // Extended Playback & Move Controls
     app.post('/api/control', async (req, res) => {
         const { action, from, to } = req.body;
         const queue = discordClient.player?.nodes?.cache?.first();
@@ -72,10 +67,30 @@ function startServer(discordClient) {
             queue.node.insert(track, to - 1);
         }
         
+        // Force Panel Update if it exists
+        if (queue.metadata && queue.metadata.panelMessage) {
+            try {
+                const { EmbedBuilder } = require('discord.js');
+                const current = queue.currentTrack;
+                const upNext = queue.tracks.toArray().slice(0, 2);
+                const embed = new EmbedBuilder().setColor('#89b4fa').setTitle('🎛️ Miko Music Control Panel');
+                if (current) {
+                    embed.addFields({ name: '▶️ Now Playing', value: `[**${current.title}**](${current.url}) - \`${current.duration}\`` });
+                    const nextText = upNext.length > 0 ? upNext.map((t, i) => `**${i+1}.** ${t.title}`).join('\n') : 'Queue is empty.';
+                    embed.addFields({ name: '⏭️ Up Next', value: nextText });
+                    const mode = queue.repeatMode === QueueRepeatMode.TRACK ? 'Track' : queue.repeatMode === QueueRepeatMode.QUEUE ? 'Queue' : 'Off';
+                    embed.setFooter({ text: `Queue: ${queue.tracks.size} tracks | Loop: ${mode}` });
+                } else {
+                    embed.setDescription('*Nothing is currently playing.*');
+                    embed.setFooter({ text: 'Queue is empty' });
+                }
+                await queue.metadata.panelMessage.edit({ embeds: [embed] });
+            } catch(e){}
+        }
+        
         res.json({ success: true });
     });
 
-    // Emergency Extractor Fix
     app.post('/api/update-extractors', (req, res) => {
         exec('npm install discord-player-youtubei youtube-ext play-dl @distube/ytdl-core@latest', (err) => {
             if (err) return res.status(500).json({ success: false });

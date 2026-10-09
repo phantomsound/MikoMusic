@@ -8,7 +8,7 @@
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
         .card { background: #313244; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; }
         .card.full { grid-column: span 2; }
-        input, select { width: calc(100% - 1rem); padding: 0.5rem; margin: 0.2rem 0; background: #181825; border: 1px solid #45475a; color: white; border-radius: 4px; }
+        input, select { padding: 0.5rem; margin: 0.2rem 0; background: #181825; border: 1px solid #45475a; color: white; border-radius: 4px; }
         button { background: #89b4fa; color: #11111b; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 0.5rem; }
         button:hover { background: #74c7ec; }
         .btn-success { background: #a6e3a1; color: #11111b; }
@@ -16,10 +16,10 @@
         .btn-warning { background: #f9e2af; color:#11111b; }
         .controls-row { display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; }
         .pl-item, .queue-item { background: #181825; padding: 0.5rem; margin-top: 0.5rem; border-radius: 4px; display: flex; align-items: center; gap: 0.5rem;}
-        .pl-item input { margin: 0; width: 45%; }
         .help-text { font-size: 0.85rem; color: #a6adc8; margin-bottom: 1rem; display: block; }
         .move-box { display: flex; gap: 0.5rem; align-items: center; margin-top: 1rem; background: #181825; padding: 0.5rem; border-radius: 4px;}
         .move-box input { width: 60px; margin: 0; }
+        .pl-name { flex: 3; } .pl-code { flex: 2; } .pl-url { flex: 5; }
     </style>
 </head>
 <body>
@@ -49,10 +49,10 @@
         <div class="card">
             <h3>Discord Channel Routing</h3>
             <span class="help-text">Select where the bot operates and sends logs.</span>
-            <label>Dedicated /summon Panel Channel:</label>
-            <select id="panelChannelId"><option value="">-- No Restriction (Anywhere) --</option></select>
-            <label>Notification Log Channel (Now Playing, etc.):</label>
-            <select id="logChannelId"><option value="">-- Do Not Send Logs --</option></select>
+            <label style="display:block; margin-top:10px;">Dedicated /summon Panel Channel:</label>
+            <select id="panelChannelId" style="width:100%;"><option value="">-- No Restriction (Anywhere) --</option></select>
+            <label style="display:block; margin-top:10px;">Notification Log Channel (Now Playing, etc.):</label>
+            <select id="logChannelId" style="width:100%;"><option value="">-- Do Not Send Logs --</option></select>
             <button onclick="updateChannels()">Save Routing</button>
         </div>
 
@@ -73,8 +73,8 @@
     </div>
     
     <div class="card full">
-        <h3>Playlist Manager (Notepad)</h3>
-        <p class="help-text">Edit your saved playlists for the /summon menu below. Click Save All Playlists to push changes.</p>
+        <h3>Playlist Manager & Macros (Notepad)</h3>
+        <p class="help-text">Set an optional shortcode (e.g., <code>fng</code>). Users can type this shortcode directly into the Discord "Add Song" popup to instantly queue the associated URL.</p>
         <div id="plContainer"></div>
         <button onclick="addEmptyPlaylistRow()" class="btn-success">+ Add Row</button>
         <button onclick="savePlaylists()">💾 Save All Playlists</button>
@@ -110,7 +110,7 @@
             });
         }
 
-        setInterval(refreshQueue, 5000); // Auto-refresh queue every 5s
+        setInterval(refreshQueue, 5000);
 
         function renderPlaylists() {
             const container = document.getElementById('plContainer');
@@ -118,26 +118,28 @@
             cachedPlaylists.forEach((pl, index) => {
                 container.innerHTML += `
                     <div class="pl-item" id="pl-${index}">
-                        <input type="text" value="${pl.name}" id="pl-name-${index}" placeholder="Name">
-                        <input type="text" value="${pl.url}" id="pl-url-${index}" placeholder="URL">
+                        <input type="text" value="${pl.name || ''}" id="pl-name-${index}" class="pl-name" placeholder="Playlist Name">
+                        <input type="text" value="${pl.shortcode || ''}" id="pl-code-${index}" class="pl-code" placeholder="Shortcode (e.g. mix)">
+                        <input type="text" value="${pl.url || ''}" id="pl-url-${index}" class="pl-url" placeholder="Full Spotify/YouTube URL">
                         <button class="btn-danger" style="margin:0;" onclick="removePlaylistRow(${index})">X</button>
                     </div>
                 `;
             });
         }
 
-        function addEmptyPlaylistRow() { cachedPlaylists.push({ name: '', url: '' }); renderPlaylists(); }
+        function addEmptyPlaylistRow() { cachedPlaylists.push({ name: '', shortcode: '', url: '' }); renderPlaylists(); }
         function removePlaylistRow(index) { cachedPlaylists.splice(index, 1); renderPlaylists(); }
 
         function savePlaylists() {
             const newPlaylists = [];
             for (let i = 0; i < cachedPlaylists.length; i++) {
                 const n = document.getElementById(`pl-name-${i}`)?.value;
+                const c = document.getElementById(`pl-code-${i}`)?.value.toLowerCase().trim();
                 const u = document.getElementById(`pl-url-${i}`)?.value;
-                if (n && u) newPlaylists.push({ name: n, url: u });
+                if (n && u) newPlaylists.push({ name: n, shortcode: c, url: u });
             }
             fetch('/api/playlists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playlists: newPlaylists }) })
-            .then(() => alert('Playlists saved successfully!'));
+            .then(() => alert('Playlists and shortcodes saved successfully!'));
         }
 
         function updateChannels() {
