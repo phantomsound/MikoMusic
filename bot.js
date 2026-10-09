@@ -29,7 +29,9 @@ function startBot() {
         await player.extractors.loadDefault();
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-        await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), [{ name: 'summon', description: 'Summons the Miko Music Control Panel' }]);
+        const cmds = [{ name: 'summon', description: 'Summons the Miko Music Control Panel' }];
+        await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: cmds });
+        client.guilds.cache.forEach(g => rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, g.id), { body: cmds }).catch(()=>{}));
     });
 
     async function handlePlaybackAndSync(channel, query, interaction) {
@@ -128,3 +130,4 @@ function startBot() {
     return client;
 }
 module.exports = { startBot };
+
