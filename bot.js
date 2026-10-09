@@ -90,31 +90,54 @@ function startBot() {
     client.once('clientReady', async () => {
         try {
             console.log("Loading Extractor Engines...");
-            
-            // 1. Unpack the TV module dynamically to prevent 'undefined' crashes
-            const tvModule = require('discord-player-youtubei');
-            const YoutubeiEngine = tvModule.YoutubeiExtractor || tvModule.default || tvModule;
-            
-            // 2. Force an identifier string so v7 register() doesn't crash
-            if (!YoutubeiEngine.identifier) YoutubeiEngine.identifier = 'YoutubeiExtractor';
-
-            await player.extractors.register(YoutubeiEngine, {});
-            console.log("✅ YoutubeiExtractor (Android TV) Registered");
-
-            // 3. Load native Extractors
             const { DefaultExtractors, SpotifyExtractor } = require('@discord-player/extractor');
             
-            // 4. Explicitly bridge Spotify to the TV Engine to dodge VEVO walls
-            await player.extractors.register(SpotifyExtractor, { bridgeProvider: YoutubeiEngine });
-            console.log("✅ Spotify explicitly bridged to Android TV Engine");
-            
-            // 5. Load the remaining standard extractors (skipping Spotify to protect our bridge)
+            // 1. Aggressively scan the Android TV Package to find the constructor class natively
+            let tvModule;
+            try { tvModule = require('discord-player-youtubei'); } catch (err) {}
+
+            let TVEngine = null;
+            if (tvModule) {
+                if (typeof tvModule === 'function') {
+                    TVEngine = tvModule;
+                } else if (typeof tvModule === 'object') {
+                    // Check standard documented exports first
+                    if (typeof tvModule.YoutubeiExtractor === 'function') TVEngine = tvModule.YoutubeiExtractor;
+                    else if (typeof tvModule.YouTubeiExtractor === 'function') TVEngine = tvModule.YouTubeiExtractor;
+                    else if (typeof tvModule.default === 'function') TVEngine = tvModule.default;
+                    else {
+                        // Aggressive hunt: scan all exports for the first valid class constructor
+                        for (const key in tvModule) {
+                            if (typeof tvModule[key] === 'function') {
+                                TVEngine = tvModule[key];
+                                if (key[0] === key[0].toUpperCase()) break; // Usually classes are capitalized
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Safely register what we found
+            if (typeof TVEngine === 'function') {
+                if (!TVEngine.identifier) TVEngine.identifier = TVEngine.name || 'YoutubeiExtractor';
+                await player.extractors.register(TVEngine, {});
+                console.log(`✅ ${TVEngine.identifier} (Android TV) dynamically mounted!`);
+                
+                // Force Spotify to bridge through the exact TV engine we just found
+                await player.extractors.register(SpotifyExtractor, { bridgeProvider: TVEngine });
+                console.log("✅ Spotify explicitly bridged to Android TV Engine");
+            } else {
+                console.error(`❌ CRITICAL: TV Engine Class not found! Raw exports:`, tvModule ? Object.keys(tvModule) : 'None');
+                await player.extractors.register(SpotifyExtractor, {}); // Fallback so bot doesn't completely die
+            }
+
+            // 3. Load remaining native extractors (Skipping Spotify since we just handled it manually)
             const remainingExtractors = DefaultExtractors.filter(ext => ext.name !== 'SpotifyExtractor');
             await player.extractors.loadMulti(remainingExtractors);
             
-            console.log(`✅ Extractors Active: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
+            console.log(`✅ All Extractors Active: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
         } catch (e) {
-            console.error("❌ Extractor Load Error:", e.stack);
+            console.error("❌ Fatal Extractor Pipeline Error:", e.stack);
         }
         
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
