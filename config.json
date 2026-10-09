@@ -5,11 +5,18 @@
   "savedPlaylists": [
     {
       "name": "Friday Night Gamers",
-      "url": "https://music.youtube.com/playlist?list=PL..."
+      "shortcode": "fng",
+      "url": "https://music.youtube.com/playlist?list=PLPsyW1DuhtHE"
     },
     {
       "name": "DOWNTEMPO GROOVE",
-      "url": "https://music.youtube.com/playlist?list=PL..."
+      "shortcode": "dtg",
+      "url": "https://music.youtube.com/playlist?list=PLaZjsqmdfN2U&si=97mHSbaMgg1XFTQe"
+    },
+    {
+      "name": "After a Long Day of Work",
+      "shortcode": "aaldow",
+      "url": " https://music.youtube.com/playlist?list=PLGy6G8k8BIAQ&si=GwQ91uorXKLB0i7g"
     }
   ],
   "panelChannelId": "1557946904766058577",
