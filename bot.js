@@ -86,27 +86,20 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            const { DefaultExtractors } = require('@discord-player/extractor');
-            
-            // 1. Securely bind the Android TV bypass engine so Spotify has a bridge
-            let YTExtractor;
-            try {
-                const ytPkg = require('discord-player-youtubei');
-                YTExtractor = ytPkg.YoutubeiExtractor || ytPkg.default || ytPkg;
-            } catch (err) {
-                console.error("Android TV Engine Missing:", err.message);
-            }
+            // 1. Explicitly load Android TV Bypass Engine
+            const { YoutubeiExtractor } = require('discord-player-youtubei');
+            await player.extractors.register(YoutubeiExtractor, {});
+            console.log('✅ Android TV Engine Registered.');
 
-            if (YTExtractor) {
-                await player.extractors.register(YTExtractor, {});
-                console.log('✅ Android TV Engine (YoutubeiExtractor) Registered.');
-            }
-
-            // 2. Load the official v7 Extractors (Spotify, Apple) while stripping the broken legacy YouTube module
-            const safeExtractors = DefaultExtractors.filter(ext => ext.name !== 'YouTubeExtractor');
-            await player.extractors.loadMulti(safeExtractors);
+            // 2. Load Official v7 Extractors
+            const { SpotifyExtractor, AppleMusicExtractor, SoundCloudExtractor } = require('@discord-player/extractor');
             
-            console.log(`✅ Native v7 Extractors Active: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
+            // 3. EXPLICITLY MAP Spotify to use the Android TV Engine as its Bridge (Prevents SoundCloud fallback!)
+            await player.extractors.register(SpotifyExtractor, { bridgeProvider: YoutubeiExtractor });
+            await player.extractors.register(AppleMusicExtractor, { bridgeProvider: YoutubeiExtractor });
+            await player.extractors.register(SoundCloudExtractor, {});
+
+            console.log(`✅ Extractors Active and Spotify is explicitly locked to TV Spoofing Bridge!`);
         } catch (e) {
             console.error("Extractor Setup Crash:", e.stack);
         }
