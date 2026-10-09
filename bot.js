@@ -91,14 +91,26 @@ function startBot() {
         try {
             console.log("Loading Extractor Engines...");
             
-            // 1. Explicitly register the Android TV YouTube engine
-            const { YoutubeiExtractor } = require('discord-player-youtubei');
-            await player.extractors.register(YoutubeiExtractor, {});
+            // 1. Unpack the TV module dynamically to prevent 'undefined' crashes
+            const tvModule = require('discord-player-youtubei');
+            const YoutubeiEngine = tvModule.YoutubeiExtractor || tvModule.default || tvModule;
+            
+            // 2. Force an identifier string so v7 register() doesn't crash
+            if (!YoutubeiEngine.identifier) YoutubeiEngine.identifier = 'YoutubeiExtractor';
+
+            await player.extractors.register(YoutubeiEngine, {});
             console.log("✅ YoutubeiExtractor (Android TV) Registered");
 
-            // 2. Load all other remaining safe Default Extractors (Spotify, Apple, SoundCloud)
-            const { DefaultExtractors } = require('@discord-player/extractor');
-            await player.extractors.loadMulti(DefaultExtractors);
+            // 3. Load native Extractors
+            const { DefaultExtractors, SpotifyExtractor } = require('@discord-player/extractor');
+            
+            // 4. Explicitly bridge Spotify to the TV Engine to dodge VEVO walls
+            await player.extractors.register(SpotifyExtractor, { bridgeProvider: YoutubeiEngine });
+            console.log("✅ Spotify explicitly bridged to Android TV Engine");
+            
+            // 5. Load the remaining standard extractors (skipping Spotify to protect our bridge)
+            const remainingExtractors = DefaultExtractors.filter(ext => ext.name !== 'SpotifyExtractor');
+            await player.extractors.loadMulti(remainingExtractors);
             
             console.log(`✅ Extractors Active: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
         } catch (e) {
