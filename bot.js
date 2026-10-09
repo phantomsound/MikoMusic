@@ -76,7 +76,9 @@ function startBot() {
     player.events.on('disconnect', (queue) => updatePanel(queue));
 
     client.once('clientReady', async () => {
-        await player.extractors.loadDefault();
+        const { YoutubeiExtractor } = require('discord-player-youtubei');
+        await player.extractors.register(YoutubeiExtractor, {});
+        await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
         const cmds = [
@@ -280,3 +282,4 @@ function startBot() {
     return client;
 }
 module.exports = { startBot };
+
