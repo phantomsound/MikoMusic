@@ -1,5 +1,6 @@
 ﻿const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
-const { Player, QueueRepeatMode, QueryType } = require('discord-player');
+const { Player, QueueRepeatMode, Track, Playlist } = require('discord-player');
+const playdl = require('play-dl');
 const fs = require('fs');
 
 function getConfig() {
@@ -48,8 +49,8 @@ function startBot() {
     const player = new Player(client);
     client.player = player;
     
-    player.events.on('error', (q, e) => console.log('Player Error:', e.message));
-    player.events.on('playerError', (q, e) => console.log('Audio Error:', e.message));
+    player.events.on('error', () => {});
+    player.events.on('playerError', () => {});
     player.events.on('playerStart', (queue, track) => { logNowPlaying(queue.guild, track); updatePanel(queue); });
     player.events.on('audioTrackAdd', (queue) => updatePanel(queue));
     player.events.on('audioTracksAdd', (queue) => updatePanel(queue));
@@ -59,13 +60,10 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            // Force the default extractor to strictly use the play-dl bypass
             await player.extractors.loadDefault({
-                youtube: {
-                    useClient: 'play-dl'
-                }
+                youtube: { useClient: 'play-dl' }
             });
-            console.log("✅ Play-DL YouTube Bypass Engine Loaded.");
+            console.log("✅ Play-DL Audio Stream Engine Loaded.");
         } catch (e) { console.error("Extractor Load Error:", e); }
         
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
@@ -87,38 +85,86 @@ function startBot() {
             const matchedMacro = playlists.find(pl => pl.shortcode && pl.shortcode.toLowerCase() === cleanQuery);
             let safeQuery = matchedMacro ? matchedMacro.url : rawQuery;
             
-            let queryType = QueryType.AUTO;
+            let playTarget = null;
+            let queryTitle = '';
 
-            // Strip tracking codes and explicitly tell discord-player it's a playlist to prevent auto-detect failures
+            // ABSOLUTE BYPASS: Intercept YouTube links and manually construct metadata
             if (safeQuery.includes('youtube.com') || safeQuery.includes('youtu.be')) {
                 safeQuery = safeQuery.replace('music.youtube.com', 'www.youtube.com');
-                try { 
-                    const u = new URL(safeQuery); 
-                    u.searchParams.delete('si'); 
-                    safeQuery = u.toString();
-                    if (u.searchParams.has('list')) queryType = QueryType.YOUTUBE_PLAYLIST;
-                    else if (u.searchParams.has('v')) queryType = QueryType.YOUTUBE_VIDEO;
-                } catch(e) {}
+                try { const u = new URL(safeQuery); u.searchParams.delete('si'); safeQuery = u.toString(); } catch(e) {}
+
+                console.log(`[Bypass] Intercepting URL for direct play-dl extraction...`);
+                try {
+                    if (safeQuery.includes('list=')) {
+                        const playlistData = await playdl.playlist_info(safeQuery, { incomplete: true });
+                        const videos = await playlistData.all_videos();
+                        
+                        if (videos.length > 0) {
+                            const customPlaylist = new Playlist(player, {
+                                title: playlistData.title,
+                                description: playlistData.title,
+                                thumbnail: playlistData.thumbnail?.url || playlistData.thumbnail || '',
+                                type: 'playlist',
+                                source: 'youtube',
+                                author: { name: playlistData.channel?.name || 'YouTube' },
+                                tracks: [],
+                                id: playlistData.id,
+                                url: playlistData.url
+                            });
+
+                            const customTracks = videos.map(v => new Track(player, {
+                                title: v.title,
+                                author: v.channel?.name || 'Unknown',
+                                url: v.url,
+                                thumbnail: v.thumbnails?.[0]?.url || v.thumbnail || '',
+                                duration: v.durationRaw,
+                                views: v.views,
+                                requestedBy: interaction.user,
+                                source: 'youtube'
+                            }));
+                            
+                            customPlaylist.tracks = customTracks;
+                            customTracks.forEach(t => t.playlist = customPlaylist);
+                            
+                            playTarget = customPlaylist;
+                            queryTitle = customPlaylist.title;
+                        }
+                    } else {
+                        const videoData = (await playdl.video_info(safeQuery)).video_details;
+                        playTarget = new Track(player, {
+                            title: videoData.title,
+                            author: videoData.channel?.name,
+                            url: videoData.url,
+                            thumbnail: videoData.thumbnails?.[0]?.url || videoData.thumbnail || '',
+                            duration: videoData.durationRaw,
+                            views: videoData.views,
+                            requestedBy: interaction.user,
+                            source: 'youtube'
+                        });
+                        queryTitle = playTarget.title;
+                    }
+                } catch (e) {
+                    console.error("Play-DL Direct Extraction Error:", e.message);
+                }
             }
-            
-            console.log(`Searching via Bypass: ${safeQuery}`);
-            const result = await player.search(safeQuery, { 
-                requestedBy: interaction.user,
-                searchEngine: queryType
-            });
-            
-            if (!result || !result.hasTracks()) {
-                console.error("Search Result Empty:", result);
-                return interaction.followUp(`❌ No tracks found for: ${safeQuery}\n*(YouTube IP Block active or Playlist is Private)*`);
+
+            // Fallback to default discord-player engine if not YouTube, or if the bypass failed
+            if (!playTarget) {
+                const result = await player.search(safeQuery, { requestedBy: interaction.user });
+                if (!result || !result.hasTracks()) {
+                    return interaction.followUp(`❌ No tracks found for: ${safeQuery}\n*(YouTube IP Block active or Playlist is Private)*`);
+                }
+                playTarget = result;
+                queryTitle = result.playlist ? result.playlist.title : result.tracks[0].title;
             }
             
             const queue = player.nodes.create(interaction.guild, { metadata: { channel: interaction.channel, panelMessage: null }, leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false });
             if (!queue.connection) await queue.connect(channel);
-            await player.play(channel, result, { nodeOptions: { metadata: queue.metadata } });
             
-            const title = result.playlist ? result.playlist.title : result.tracks[0].title;
+            await player.play(channel, playTarget, { nodeOptions: { metadata: queue.metadata } });
+            
             const aliasTag = matchedMacro ? ` *(shortcode: ${matchedMacro.shortcode})*` : '';
-            await interaction.followUp({ content: `✅ Queued: **${title}**${aliasTag}`, ephemeral: true });
+            await interaction.followUp({ content: `✅ Queued: **${queryTitle}**${aliasTag}`, ephemeral: true });
         } catch (err) {
             console.error("Playback Error:", err);
             await interaction.followUp(`❌ Failed to play track. Error: ${err.message}`);
