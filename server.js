@@ -13,45 +13,69 @@ function startServer(discordClient) {
         res.json({ ...config, clientId: process.env.CLIENT_ID });
     });
 
-    // Update Core Config
-    app.post('/api/update', async (req, res) => {
-        const { adminUsers, adminRoles } = req.body;
-        const config = JSON.parse(fs.readFileSync('./config.json', 'utf-8'));
-        
-        if (adminUsers !== undefined) config.adminUsers = adminUsers.split(',').map(s => s.trim()).filter(s => s);
-        if (adminRoles !== undefined) config.adminRoles = adminRoles.split(',').map(s => s.trim()).filter(s => s);
-
-        fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
-        res.json({ success: true, config });
+    // Fetch Discord Channels for Dropdowns
+    app.get('/api/channels', (req, res) => {
+        const guild = discordClient.guilds.cache.first();
+        if (!guild) return res.json([]);
+        const channels = guild.channels.cache.filter(c => c.isTextBased()).map(c => ({ id: c.id, name: c.name }));
+        res.json(channels);
     });
 
-    // Full Array Replacement for Playlist Editing
-    app.post('/api/playlists', (req, res) => {
-        const { playlists } = req.body;
+    // Fetch Live Queue Data
+    app.get('/api/queue', (req, res) => {
+        const queue = discordClient.player?.nodes?.cache?.first();
+        if (!queue) return res.json({ current: null, tracks: [] });
+        res.json({
+            current: queue.currentTrack ? queue.currentTrack.title : null,
+            tracks: queue.tracks.map((t, i) => ({ index: i + 1, title: t.title }))
+        });
+    });
+
+    // Update Channel Config
+    app.post('/api/update-channels', (req, res) => {
+        const { panelChannelId, logChannelId } = req.body;
         const config = JSON.parse(fs.readFileSync('./config.json', 'utf-8'));
-        config.savedPlaylists = playlists;
+        config.panelChannelId = panelChannelId;
+        config.logChannelId = logChannelId;
         fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
         res.json({ success: true });
     });
 
-    // Extended Playback Controls
+    // Full Array Replacement for Playlist Editing
+    app.post('/api/playlists', (req, res) => {
+        const config = JSON.parse(fs.readFileSync('./config.json', 'utf-8'));
+        config.savedPlaylists = req.body.playlists;
+        fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
+        res.json({ success: true });
+    });
+
+    // Extended Playback & Move Controls
     app.post('/api/control', async (req, res) => {
-        const { action } = req.body;
+        const { action, from, to } = req.body;
         const queue = discordClient.player?.nodes?.cache?.first();
         if (!queue) return res.json({ success: false, message: "No active music session." });
 
         if (action === 'pause') queue.node.setPaused(!queue.node.isPaused());
         if (action === 'skip') queue.node.skip();
         if (action === 'stop') queue.delete();
-        if (action === 'back') await queue.history.previous();
+        if (action === 'back' && queue.history.previousTrack) await queue.history.previous();
         if (action === 'shuffle') queue.tracks.shuffle();
         if (action === 'loopTrack') queue.setRepeatMode(QueueRepeatMode.TRACK);
         if (action === 'loopQueue') queue.setRepeatMode(QueueRepeatMode.QUEUE);
         if (action === 'loopOff') queue.setRepeatMode(QueueRepeatMode.OFF);
         
+        if (action === 'move') {
+            const tracks = queue.tracks.toArray();
+            if (from < 1 || from > tracks.length || to < 1) return res.json({ success: false, message: "Invalid index" });
+            const track = tracks[from - 1];
+            queue.node.remove(track);
+            queue.node.insert(track, to - 1);
+        }
+        
         res.json({ success: true });
     });
 
+    // Emergency Extractor Fix
     app.post('/api/update-extractors', (req, res) => {
         exec('npm install discord-player-youtubei youtube-ext play-dl @distube/ytdl-core@latest', (err) => {
             if (err) return res.status(500).json({ success: false });

@@ -4,20 +4,22 @@
     <meta charset="UTF-8">
     <title>Miko Music - Admin</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #1e1e2e; color: #cdd6f4; padding: 2rem; max-width: 950px; margin: 0 auto; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #1e1e2e; color: #cdd6f4; padding: 2rem; max-width: 1000px; margin: 0 auto; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
         .card { background: #313244; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; }
         .card.full { grid-column: span 2; }
-        input { width: calc(100% - 1rem); padding: 0.5rem; margin: 0.2rem 0; background: #181825; border: 1px solid #45475a; color: white; border-radius: 4px; }
+        input, select { width: calc(100% - 1rem); padding: 0.5rem; margin: 0.2rem 0; background: #181825; border: 1px solid #45475a; color: white; border-radius: 4px; }
         button { background: #89b4fa; color: #11111b; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 0.5rem; }
         button:hover { background: #74c7ec; }
         .btn-success { background: #a6e3a1; color: #11111b; }
         .btn-danger { background: #f38ba8; }
         .btn-warning { background: #f9e2af; color:#11111b; }
         .controls-row { display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; }
-        .pl-item { background: #181825; padding: 0.5rem; margin-top: 0.5rem; border-radius: 4px; display: flex; align-items: center; gap: 0.5rem;}
+        .pl-item, .queue-item { background: #181825; padding: 0.5rem; margin-top: 0.5rem; border-radius: 4px; display: flex; align-items: center; gap: 0.5rem;}
         .pl-item input { margin: 0; width: 45%; }
-        .drag-handle { cursor: grab; font-size: 1.2rem; padding: 0 0.5rem; }
+        .help-text { font-size: 0.85rem; color: #a6adc8; margin-bottom: 1rem; display: block; }
+        .move-box { display: flex; gap: 0.5rem; align-items: center; margin-top: 1rem; background: #181825; padding: 0.5rem; border-radius: 4px;}
+        .move-box input { width: 60px; margin: 0; }
     </style>
 </head>
 <body>
@@ -27,49 +29,88 @@
     </div>
     
     <div class="card full" style="border-left: 4px solid #f9e2af;">
-        <h3>Live Audio Overrides</h3>
+        <h3>Live Audio Overrides & Maintenance</h3>
         <div class="controls-row">
             <button onclick="controlPlayer('back')">⏮️ Back</button>
             <button onclick="controlPlayer('pause')">⏯️ Play / Pause</button>
             <button onclick="controlPlayer('skip')">⏭️ Skip</button>
-            <button onclick="controlPlayer('shuffle')" class="btn-warning">🔀 Shuffle Queue</button>
+            <button onclick="controlPlayer('shuffle')" class="btn-warning">🔀 Shuffle</button>
             <button onclick="controlPlayer('loopTrack')" class="btn-success">🔂 Loop Track</button>
             <button onclick="controlPlayer('loopQueue')" class="btn-success">🔁 Loop Queue</button>
             <button onclick="controlPlayer('loopOff')" class="btn-danger">❌ Loop Off</button>
             <button onclick="controlPlayer('stop')" class="btn-danger">⏹️ Stop & Disconnect</button>
         </div>
+        <hr style="border: 1px solid #45475a; margin: 1.5rem 0;">
+        <span class="help-text">Restore YouTube Extractors if streaming starts breaking. (Takes 30s)</span>
+        <button onclick="updateExtractors()" class="btn-warning">🔄 Force-Update YouTube Extractors</button>
     </div>
 
     <div class="grid">
         <div class="card">
-            <h3>Permissions (Security)</h3>
-            <label>Admin User IDs:</label>
-            <input type="text" id="adminUsers">
-            <label>Admin Role IDs:</label>
-            <input type="text" id="adminRoles">
-            <button onclick="updateSettings()">Save Permissions</button>
+            <h3>Discord Channel Routing</h3>
+            <span class="help-text">Select where the bot operates and sends logs.</span>
+            <label>Dedicated /summon Panel Channel:</label>
+            <select id="panelChannelId"><option value="">-- No Restriction (Anywhere) --</option></select>
+            <label>Notification Log Channel (Now Playing, etc.):</label>
+            <select id="logChannelId"><option value="">-- Do Not Send Logs --</option></select>
+            <button onclick="updateChannels()">Save Routing</button>
         </div>
 
         <div class="card">
-            <h3>Playlist Manager (Notepad)</h3>
-            <p style="font-size: 0.85rem; color:#a6adc8;">Edit your saved playlists for the /summon menu below. Click Save to push changes.</p>
-            <div id="plContainer"></div>
-            <button onclick="addEmptyPlaylistRow()" class="btn-success">+ Add Row</button>
-            <button onclick="savePlaylists()">💾 Save All Playlists</button>
+            <h3>Live Queue Management</h3>
+            <span class="help-text">View and manage the active queue.</span>
+            <div id="activeNowPlaying" style="color: #a6e3a1; font-weight: bold; margin-bottom: 0.5rem;">Nothing Playing</div>
+            <div id="queueContainer" style="max-height: 200px; overflow-y: auto;"></div>
+            
+            <div class="move-box">
+                <span>Move Track #</span>
+                <input type="number" id="moveFrom" min="1">
+                <span>to Position #</span>
+                <input type="number" id="moveTo" min="1">
+                <button onclick="moveTrack()" class="btn-success" style="margin: 0;">Move</button>
+            </div>
         </div>
+    </div>
+    
+    <div class="card full">
+        <h3>Playlist Manager (Notepad)</h3>
+        <p class="help-text">Edit your saved playlists for the /summon menu below. Click Save All Playlists to push changes.</p>
+        <div id="plContainer"></div>
+        <button onclick="addEmptyPlaylistRow()" class="btn-success">+ Add Row</button>
+        <button onclick="savePlaylists()">💾 Save All Playlists</button>
     </div>
     
     <script>
         let cachedPlaylists = [];
 
         function loadConfig() {
-            fetch('/api/config').then(r => r.json()).then(data => {
-                document.getElementById('adminUsers').value = (data.adminUsers || []).join(', ');
-                document.getElementById('adminRoles').value = (data.adminRoles || []).join(', ');
-                cachedPlaylists = data.savedPlaylists || [];
-                renderPlaylists();
+            fetch('/api/channels').then(r => r.json()).then(channels => {
+                const panel = document.getElementById('panelChannelId');
+                const log = document.getElementById('logChannelId');
+                channels.forEach(c => {
+                    panel.innerHTML += `<option value="${c.id}">#${c.name}</option>`;
+                    log.innerHTML += `<option value="${c.id}">#${c.name}</option>`;
+                });
+                
+                fetch('/api/config').then(r => r.json()).then(data => {
+                    if (data.panelChannelId) panel.value = data.panelChannelId;
+                    if (data.logChannelId) log.value = data.logChannelId;
+                    cachedPlaylists = data.savedPlaylists || [];
+                    renderPlaylists();
+                });
+            });
+            refreshQueue();
+        }
+
+        function refreshQueue() {
+            fetch('/api/queue').then(r => r.json()).then(data => {
+                document.getElementById('activeNowPlaying').innerText = data.current ? `▶️ ${data.current}` : 'Nothing Playing';
+                const qc = document.getElementById('queueContainer');
+                qc.innerHTML = data.tracks.length ? data.tracks.map(t => `<div class="queue-item"><span>${t.index}.</span> <span>${t.title}</span></div>`).join('') : '<span class="help-text">Queue is empty.</span>';
             });
         }
+
+        setInterval(refreshQueue, 5000); // Auto-refresh queue every 5s
 
         function renderPlaylists() {
             const container = document.getElementById('plContainer');
@@ -77,7 +118,6 @@
             cachedPlaylists.forEach((pl, index) => {
                 container.innerHTML += `
                     <div class="pl-item" id="pl-${index}">
-                        <span class="drag-handle">↕️</span>
                         <input type="text" value="${pl.name}" id="pl-name-${index}" placeholder="Name">
                         <input type="text" value="${pl.url}" id="pl-url-${index}" placeholder="URL">
                         <button class="btn-danger" style="margin:0;" onclick="removePlaylistRow(${index})">X</button>
@@ -86,15 +126,8 @@
             });
         }
 
-        function addEmptyPlaylistRow() {
-            cachedPlaylists.push({ name: '', url: '' });
-            renderPlaylists();
-        }
-
-        function removePlaylistRow(index) {
-            cachedPlaylists.splice(index, 1);
-            renderPlaylists();
-        }
+        function addEmptyPlaylistRow() { cachedPlaylists.push({ name: '', url: '' }); renderPlaylists(); }
+        function removePlaylistRow(index) { cachedPlaylists.splice(index, 1); renderPlaylists(); }
 
         function savePlaylists() {
             const newPlaylists = [];
@@ -103,14 +136,19 @@
                 const u = document.getElementById(`pl-url-${i}`)?.value;
                 if (n && u) newPlaylists.push({ name: n, url: u });
             }
-            fetch('/api/playlists', {
+            fetch('/api/playlists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playlists: newPlaylists }) })
+            .then(() => alert('Playlists saved successfully!'));
+        }
+
+        function updateChannels() {
+            fetch('/api/update-channels', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ playlists: newPlaylists })
-            }).then(() => {
-                alert('Playlists saved successfully!');
-                loadConfig();
-            });
+                body: JSON.stringify({
+                    panelChannelId: document.getElementById('panelChannelId').value,
+                    logChannelId: document.getElementById('logChannelId').value
+                })
+            }).then(() => alert('Channel Routing saved.'));
         }
         
         loadConfig();
@@ -123,20 +161,22 @@
             });
         }
 
-        function updateSettings() {
-            fetch('/api/update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    adminUsers: document.getElementById('adminUsers').value,
-                    adminRoles: document.getElementById('adminRoles').value
-                })
-            }).then(() => alert('Permissions saved.'));
-        }
-
         function controlPlayer(action) {
             fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
-            .then(r => r.json()).then(res => { if(!res.success) alert(res.message); });
+            .then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); });
+        }
+
+        function moveTrack() {
+            const from = document.getElementById('moveFrom').value;
+            const to = document.getElementById('moveTo').value;
+            fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move', from, to }) })
+            .then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); document.getElementById('moveFrom').value=''; document.getElementById('moveTo').value=''; });
+        }
+
+        function updateExtractors() {
+            if(confirm('Freeze bot and force-update YouTube bypasses?')) {
+                fetch('/api/update-extractors', { method: 'POST' }).then(() => alert('Triggered! Rebooting in 30s.'));
+            }
         }
     </script>
 </body>

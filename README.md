@@ -1,22 +1,20 @@
-﻿# MikoDiscordMusicBot
+﻿# MikoMusic
 
-A highly customized, self-hosted Discord Music Bot built with Discord.js v14 and Discord-Player. Includes an interactive Discord UI panel (`/summon`) and a local Web Dashboard for admin overrides.
+A self-hosted, unrestrictive Discord Music Bot heavily inspired by MatchBox Bot. 
 
-## Features
-- **Control Panel Dashboard**: Type `/summon` in Discord to spawn an interactive UI with buttons and dropdowns.
-- **Dynamic Playlist Sync**: Automatically detects and queues new songs added to your live Spotify/YouTube playlists while playing.
-- **Web Admin Interface**: Local Web UI (Port 3000) to adjust permissions, manage saved playlists, override live playback, and force-update extractors.
+## Philosophy & Features
+- **Zero Restrictions**: No voting locks, no paywalls, no queue caps.
+- **24/7 Autoplay**: The bot will not leave when the queue ends unless you command it to.
+- **Dedicated Channel Routing**: Set a specific channel for the `/summon` panel, and pipe all "Now Playing" logs to a separate notification channel.
+- **Live Queue Editing**: Move tracks around the queue via Discord (`/move`) or via the Web Dashboard.
+- **Notepad Playlists**: Save and hot-load playlists securely from your local UI.
 
-## Running Locally (Windows via NSSM)
-1. Clone this repository.
-2. Run `npm install`.
-3. Rename `.env.example` to `.env` and add your `DISCORD_TOKEN` and `CLIENT_ID`.
-4. Run `node index.js`. (To run as a background service, use NSSM).
+## Local Hosting
+1. Clone the repo and run `npm install`.
+2. Setup your credentials in `.env` (Requires `DISCORD_TOKEN` and `CLIENT_ID`).
+3. Run `node index.js` (Access the Web UI at Port 3000).
 
-## Running via Docker (Hosted on Linux/VPS)
-1. Ensure Docker and docker-compose are installed.
-2. Add your `.env` file to the root directory.
-3. Run `docker-compose up -d`.
-4. Access the Web UI at `http://YOUR_SERVER_IP:3000`.
-
-*Note: Ensure `config.json` has read/write permissions so the Web UI can save your settings.*
+## Built With
+- Discord.js v14
+- Discord-Player v6
+- Express Web Dashboard
