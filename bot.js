@@ -1,5 +1,5 @@
 ﻿const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
-const { Player, QueueRepeatMode } = require('discord-player');
+const { Player, QueueRepeatMode, QueryType } = require('discord-player');
 const fs = require('fs');
 
 function getConfig() {
@@ -48,8 +48,8 @@ function startBot() {
     const player = new Player(client);
     client.player = player;
     
-    player.events.on('error', () => {});
-    player.events.on('playerError', () => {});
+    player.events.on('error', (q, e) => console.log('Player Error:', e.message));
+    player.events.on('playerError', (q, e) => console.log('Audio Error:', e.message));
     player.events.on('playerStart', (queue, track) => { logNowPlaying(queue.guild, track); updatePanel(queue); });
     player.events.on('audioTrackAdd', (queue) => updatePanel(queue));
     player.events.on('audioTracksAdd', (queue) => updatePanel(queue));
@@ -59,12 +59,13 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            const { YoutubeiExtractor } = require('discord-player-youtubei');
-            // 1. Disable the broken default YouTube scrapers completely
-            await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
-            // 2. Register the Internal API Bypass
-            await player.extractors.register(YoutubeiExtractor, {});
-            console.log("✅ YouTubei Internal API Extractor Loaded.");
+            // Force the default extractor to strictly use the play-dl bypass
+            await player.extractors.loadDefault({
+                youtube: {
+                    useClient: 'play-dl'
+                }
+            });
+            console.log("✅ Play-DL YouTube Bypass Engine Loaded.");
         } catch (e) { console.error("Extractor Load Error:", e); }
         
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
@@ -86,23 +87,29 @@ function startBot() {
             const matchedMacro = playlists.find(pl => pl.shortcode && pl.shortcode.toLowerCase() === cleanQuery);
             let safeQuery = matchedMacro ? matchedMacro.url : rawQuery;
             
-            if (safeQuery.includes('music.youtube.com')) {
+            let queryType = QueryType.AUTO;
+
+            // Strip tracking codes and explicitly tell discord-player it's a playlist to prevent auto-detect failures
+            if (safeQuery.includes('youtube.com') || safeQuery.includes('youtu.be')) {
                 safeQuery = safeQuery.replace('music.youtube.com', 'www.youtube.com');
+                try { 
+                    const u = new URL(safeQuery); 
+                    u.searchParams.delete('si'); 
+                    safeQuery = u.toString();
+                    if (u.searchParams.has('list')) queryType = QueryType.YOUTUBE_PLAYLIST;
+                    else if (u.searchParams.has('v')) queryType = QueryType.YOUTUBE_VIDEO;
+                } catch(e) {}
             }
             
-            // Explicitly force the engine to use the YouTubei API Extractor
-            let result = await player.search(safeQuery, { 
+            console.log(`Searching via Bypass: ${safeQuery}`);
+            const result = await player.search(safeQuery, { 
                 requestedBy: interaction.user,
-                searchEngine: 'youtubei' 
+                searchEngine: queryType
             });
             
-            // Fallback to auto-detect if forced engine flags it as unknown
             if (!result || !result.hasTracks()) {
-                result = await player.search(safeQuery, { requestedBy: interaction.user });
-            }
-            
-            if (!result || !result.hasTracks()) {
-                return interaction.followUp(`❌ No tracks found for: ${safeQuery}\n*(YouTube may be rate-limiting this specific query)*`);
+                console.error("Search Result Empty:", result);
+                return interaction.followUp(`❌ No tracks found for: ${safeQuery}\n*(YouTube IP Block active or Playlist is Private)*`);
             }
             
             const queue = player.nodes.create(interaction.guild, { metadata: { channel: interaction.channel, panelMessage: null }, leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false });
