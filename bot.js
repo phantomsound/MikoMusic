@@ -79,6 +79,13 @@ function startBot() {
     player.events.on('playerError', (q, e) => console.log('❌ Stream Blocked:', e.message));
     player.events.on('playerSkip', (q, track) => console.log(`⚠️ Skipped Track: ${track.title}`));
     
+    // Live Search Engine Debugging
+    player.events.on('debug', (q, m) => {
+        if (m.toLowerCase().includes('bridge') || m.toLowerCase().includes('spotify') || m.toLowerCase().includes('extract')) {
+            console.log('🔍 [DEBUG]', m);
+        }
+    });
+    
     player.events.on('playerStart', (queue, track) => { logNowPlaying(queue.guild, track); updatePanel(queue); });
     player.events.on('audioTrackAdd', (queue) => updatePanel(queue));
     player.events.on('audioTracksAdd', (queue) => updatePanel(queue));
@@ -92,7 +99,6 @@ function startBot() {
             console.log("Loading Extractor Engines...");
             const { DefaultExtractors, SpotifyExtractor } = require('@discord-player/extractor');
             
-            // 1. Aggressively scan the Android TV Package to find the constructor class natively
             let tvModule;
             try { tvModule = require('discord-player-youtubei'); } catch (err) {}
 
@@ -101,37 +107,32 @@ function startBot() {
                 if (typeof tvModule === 'function') {
                     TVEngine = tvModule;
                 } else if (typeof tvModule === 'object') {
-                    // Check standard documented exports first
                     if (typeof tvModule.YoutubeiExtractor === 'function') TVEngine = tvModule.YoutubeiExtractor;
                     else if (typeof tvModule.YouTubeiExtractor === 'function') TVEngine = tvModule.YouTubeiExtractor;
                     else if (typeof tvModule.default === 'function') TVEngine = tvModule.default;
                     else {
-                        // Aggressive hunt: scan all exports for the first valid class constructor
                         for (const key in tvModule) {
-                            if (typeof tvModule[key] === 'function') {
-                                TVEngine = tvModule[key];
-                                if (key[0] === key[0].toUpperCase()) break; // Usually classes are capitalized
-                            }
+                            if (typeof tvModule[key] === 'function') { TVEngine = tvModule[key]; break; }
                         }
                     }
                 }
             }
 
-            // 2. Safely register what we found
             if (typeof TVEngine === 'function') {
                 if (!TVEngine.identifier) TVEngine.identifier = TVEngine.name || 'YoutubeiExtractor';
                 await player.extractors.register(TVEngine, {});
-                console.log(`✅ ${TVEngine.identifier} (Android TV) dynamically mounted!`);
                 
-                // Force Spotify to bridge through the exact TV engine we just found
-                await player.extractors.register(SpotifyExtractor, { bridgeProvider: TVEngine });
-                console.log("✅ Spotify explicitly bridged to Android TV Engine");
+                // THE FIX: Get the live, running instance of the TV Engine
+                const liveTVInstance = player.extractors.get(TVEngine.identifier);
+                
+                // Pass the live instance to Spotify so it can physically execute searches
+                await player.extractors.register(SpotifyExtractor, { bridgeProvider: liveTVInstance });
+                console.log(`✅ Spotify explicitly bridged to live instance: ${TVEngine.identifier}`);
             } else {
-                console.error(`❌ CRITICAL: TV Engine Class not found! Raw exports:`, tvModule ? Object.keys(tvModule) : 'None');
-                await player.extractors.register(SpotifyExtractor, {}); // Fallback so bot doesn't completely die
+                console.error(`❌ CRITICAL: TV Engine Class not found!`);
+                await player.extractors.register(SpotifyExtractor, {}); 
             }
 
-            // 3. Load remaining native extractors (Skipping Spotify since we just handled it manually)
             const remainingExtractors = DefaultExtractors.filter(ext => ext.name !== 'SpotifyExtractor');
             await player.extractors.loadMulti(remainingExtractors);
             
