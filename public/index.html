@@ -88,13 +88,10 @@
     </div>
     
     <script>
-        let cachedClientId = null;
-
         function loadConfig() {
             fetch('/api/config').then(r => r.json()).then(data => {
                 document.getElementById('adminUsers').value = (data.adminUsers || []).join(', ');
                 document.getElementById('adminRoles').value = (data.adminRoles || []).join(', ');
-                cachedClientId = data.clientId;
                 
                 const list = document.getElementById('playlistList');
                 list.innerHTML = '';
@@ -124,24 +121,28 @@
         loadConfig();
         
         function openDiscordInvite() {
-            if (!cachedClientId) {
-                alert("Client ID not loaded yet. Make sure CLIENT_ID is set in .env.");
-                return;
-            }
-            const url = `https://discord.com/oauth2/authorize?client_id=${cachedClientId}&permissions=3148800&scope=bot%20applications.commands`;
-            const width = 500, height = 750;
-            const left = (screen.width - width) / 2;
-            const top = (screen.height - height) / 2;
-            
-            const popup = window.open(url, 'discordAuthPopup', `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,resizable=yes`);
-            
-            // Watch for popup close, then auto-refresh dashboard
-            const checker = setInterval(() => {
-                if (!popup || popup.closed) {
-                    clearInterval(checker);
-                    loadConfig();
+            // Fetch fresh config on click instead of relying on page load
+            fetch('/api/config').then(r => r.json()).then(data => {
+                let id = data.clientId;
+                if (!id || id === 'undefined') {
+                    id = prompt("The web server loaded faster than the bot could log in! Please paste your Application ID here manually:");
                 }
-            }, 1000);
+                if (!id) return; // User cancelled prompt
+                
+                const url = `https://discord.com/oauth2/authorize?client_id=${id}&permissions=3148800&scope=bot%20applications.commands`;
+                const width = 500, height = 750;
+                const left = (screen.width - width) / 2;
+                const top = (screen.height - height) / 2;
+                
+                const popup = window.open(url, 'discordAuthPopup', `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,resizable=yes`);
+                
+                const checker = setInterval(() => {
+                    if (!popup || popup.closed) {
+                        clearInterval(checker);
+                        loadConfig();
+                    }
+                }, 1000);
+            });
         }
 
         function updateSettings() {
