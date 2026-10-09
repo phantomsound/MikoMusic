@@ -4,24 +4,25 @@
     <meta charset="UTF-8">
     <title>Miko Music - Admin</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #1e1e2e; color: #cdd6f4; padding: 2rem; max-width: 1000px; margin: 0 auto; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-        .card { background: #313244; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; }
+        :root { --bg: #1e1e2e; --card: #313244; --input: #181825; --border: #45475a; --text: #cdd6f4; --blue: #89b4fa; --green: #a6e3a1; --red: #f38ba8; --yellow: #f9e2af; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); padding: 2rem; max-width: 1000px; margin: 0 auto; }
+        .grid-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .card { background: var(--card); padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; }
         .card.full { grid-column: span 2; }
-        input, select { padding: 0.5rem; margin: 0.2rem 0; background: #181825; border: 1px solid #45475a; color: white; border-radius: 4px; box-sizing: border-box; }
-        button { background: #89b4fa; color: #11111b; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 0.5rem; }
-        button:hover { background: #74c7ec; }
-        .btn-success { background: #a6e3a1; color: #11111b; }
-        .btn-danger { background: #f38ba8; }
-        .btn-warning { background: #f9e2af; color:#11111b; }
-        .controls-row { display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; }
-        .pl-item, .queue-item { background: #181825; padding: 0.5rem; margin-top: 0.5rem; border-radius: 4px; display: flex; align-items: center; gap: 0.5rem; }
+        input, select { padding: 0.6rem; background: var(--input); border: 1px solid var(--border); color: var(--text); border-radius: 4px; box-sizing: border-box; width: 100%; }
+        button { background: var(--blue); color: #11111b; padding: 0.6rem 1.2rem; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 0.5rem; transition: opacity 0.2s; }
+        button:hover { opacity: 0.8; }
+        .btn-success { background: var(--green); } .btn-danger { background: var(--red); } .btn-warning { background: var(--yellow); }
         .help-text { font-size: 0.85rem; color: #a6adc8; margin-bottom: 1rem; display: block; }
-        .move-box { display: flex; gap: 0.5rem; align-items: center; margin-top: 1rem; background: #181825; padding: 0.5rem; border-radius: 4px; }
-        .move-box input { width: 60px; margin: 0; }
-        .pl-name { flex: 3; }
-        .pl-code { flex: 2; }
-        .pl-url { flex: 5; }
+        .controls-row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+        .overrides-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 1rem; }
+        .overrides-grid button { margin: 0; width: 100%; }
+        .pl-item { display: grid; grid-template-columns: 2fr 1.5fr 4fr 50px; gap: 10px; background: var(--input); padding: 0.8rem; border-radius: 6px; margin-top: 0.5rem; align-items: center; }
+        .pl-item input { margin: 0; }
+        .pl-item button { margin: 0; padding: 0.6rem; }
+        .move-box { display: flex; gap: 0.5rem; align-items: center; margin-top: 1rem; background: var(--input); padding: 0.8rem; border-radius: 6px; }
+        .move-box input { width: 80px; margin: 0; }
+        .queue-item { padding: 0.4rem 0; border-bottom: 1px solid var(--border); font-size: 0.95rem; }
     </style>
 </head>
 <body>
@@ -30,9 +31,21 @@
         <button class="btn-success" onclick="openDiscordInvite()">➕ Invite Bot to Server</button>
     </div>
     
-    <div class="card full" style="border-left: 4px solid #f9e2af;">
-        <h3>Live Audio Overrides & Maintenance</h3>
+    <div class="card full" style="border-left: 4px solid var(--blue);">
+        <h3>📡 Remote Voice Connection</h3>
+        <span class="help-text">Instantly connect or disconnect the bot from your server without using Discord commands.</span>
         <div class="controls-row">
+            <select id="voiceChannelSelect" style="max-width: 300px; margin: 0;">
+                <option value="">-- Select Voice Channel --</option>
+            </select>
+            <button onclick="manageVoice('join')" class="btn-success" style="margin: 0;">🔊 Join Channel</button>
+            <button onclick="manageVoice('disconnect')" class="btn-danger" style="margin: 0;">🔇 Disconnect</button>
+        </div>
+    </div>
+    
+    <div class="card full" style="border-left: 4px solid var(--yellow);">
+        <h3>Live Audio Overrides & Maintenance</h3>
+        <div class="overrides-grid">
             <button onclick="controlPlayer('back')">⏮️ Back</button>
             <button onclick="controlPlayer('pause')">⏯️ Play / Pause</button>
             <button onclick="controlPlayer('skip')">⏭️ Skip</button>
@@ -40,34 +53,31 @@
             <button onclick="controlPlayer('loopTrack')" class="btn-success">🔂 Loop Track</button>
             <button onclick="controlPlayer('loopQueue')" class="btn-success">🔁 Loop Queue</button>
             <button onclick="controlPlayer('loopOff')" class="btn-danger">❌ Loop Off</button>
-            <button onclick="controlPlayer('stop')" class="btn-danger">⏹️ Stop & Disconnect</button>
+            <button onclick="controlPlayer('stop')" class="btn-danger">⏹️ Clear Queue</button>
         </div>
-        <hr style="border: 1px solid #45475a; margin: 1.5rem 0;">
-        <span class="help-text">Restore YouTube Extractors if streaming starts breaking. (Takes 30s)</span>
-        <button onclick="updateExtractors()" class="btn-warning">🔄 Force-Update YouTube Extractors</button>
     </div>
 
-    <div class="grid">
+    <div class="grid-layout">
         <div class="card">
             <h3>Discord Channel Routing</h3>
             <span class="help-text">Select where the bot operates and sends logs.</span>
             <label style="display:block; margin-top:10px;">Dedicated /summon Panel Channel:</label>
-            <select id="panelChannelId" style="width:100%;"><option value="">-- No Restriction (Anywhere) --</option></select>
+            <select id="panelChannelId"><option value="">-- No Restriction (Anywhere) --</option></select>
             <label style="display:block; margin-top:10px;">Notification Log Channel (Now Playing, etc.):</label>
-            <select id="logChannelId" style="width:100%;"><option value="">-- Do Not Send Logs --</option></select>
+            <select id="logChannelId"><option value="">-- Do Not Send Logs --</option></select>
             <button onclick="updateChannels()">Save Routing</button>
         </div>
 
         <div class="card">
             <h3>Live Queue Management</h3>
             <span class="help-text">View and manage the active queue.</span>
-            <div id="activeNowPlaying" style="color: #a6e3a1; font-weight: bold; margin-bottom: 0.5rem;">Nothing Playing</div>
-            <div id="queueContainer" style="max-height: 200px; overflow-y: auto;"></div>
+            <div id="activeNowPlaying" style="color: var(--green); font-weight: bold; margin-bottom: 0.5rem;">Nothing Playing</div>
+            <div id="queueContainer" style="max-height: 180px; overflow-y: auto; background: var(--input); padding: 0.5rem; border-radius: 4px;"></div>
             
             <div class="move-box">
-                <span>Move Track #</span>
+                <span>Move #</span>
                 <input type="number" id="moveFrom" min="1">
-                <span>to Position #</span>
+                <span>to #</span>
                 <input type="number" id="moveTo" min="1">
                 <button onclick="moveTrack()" class="btn-success" style="margin: 0;">Move</button>
             </div>
@@ -76,10 +86,12 @@
     
     <div class="card full">
         <h3>Playlist Manager & Macros (Notepad)</h3>
-        <p class="help-text">Set an optional shortcode (e.g., <code>fng</code>). Users can type this shortcode directly into the Discord "Add Song" popup to instantly queue the associated URL.</p>
+        <p class="help-text">Set an optional shortcode (e.g., <code>fng</code>) to instantly queue the associated URL in Discord. <b>Tip: Use Spotify URLs to avoid YouTube IP Blocks!</b></p>
         <div id="plContainer"></div>
-        <button onclick="addEmptyPlaylistRow()" class="btn-success">+ Add Row</button>
-        <button onclick="savePlaylists()">💾 Save All Playlists</button>
+        <div style="margin-top: 1rem;">
+            <button onclick="addEmptyPlaylistRow()" class="btn-success">+ Add Row</button>
+            <button onclick="savePlaylists()">💾 Save All Playlists</button>
+        </div>
     </div>
     
     <script>
@@ -103,6 +115,14 @@
                     renderPlaylists();
                 });
             });
+            
+            fetch('/api/voice-channels').then(r => r.json()).then(channels => {
+                const vcSelect = document.getElementById('voiceChannelSelect');
+                vcSelect.innerHTML = '<option value="">-- Select Voice Channel --</option>';
+                channels.forEach(c => {
+                    vcSelect.innerHTML += `<option value="${c.id}">🔊 ${c.name}</option>`;
+                });
+            });
             refreshQueue();
         }
 
@@ -110,11 +130,22 @@
             fetch('/api/queue').then(r => r.json()).then(data => {
                 document.getElementById('activeNowPlaying').innerText = data.current ? `▶️ ${data.current}` : 'Nothing Playing';
                 const qc = document.getElementById('queueContainer');
-                qc.innerHTML = data.tracks.length ? data.tracks.map(t => `<div class="queue-item"><span>${t.index}.</span> <span>${t.title}</span></div>`).join('') : '<span class="help-text">Queue is empty.</span>';
+                qc.innerHTML = data.tracks.length ? data.tracks.map(t => `<div class="queue-item"><b>${t.index}.</b> ${t.title}</div>`).join('') : '<span class="help-text">Queue is empty.</span>';
             });
         }
 
         setInterval(refreshQueue, 5000);
+
+        function manageVoice(action) {
+            const channelId = document.getElementById('voiceChannelSelect').value;
+            fetch('/api/voice', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ action, channelId }) 
+            }).then(r => r.json()).then(res => { 
+                if(!res.success) alert(res.message); 
+            });
+        }
 
         function syncPlaylistsFromDOM() {
             const synced = [];
@@ -132,27 +163,18 @@
             container.innerHTML = '';
             cachedPlaylists.forEach((pl, index) => {
                 container.innerHTML += `
-                    <div class="pl-item" id="pl-${index}">
-                        <input type="text" value="${pl.name || ''}" id="pl-name-${index}" class="pl-name" placeholder="Playlist Name" oninput="syncPlaylistsFromDOM()">
-                        <input type="text" value="${pl.shortcode || ''}" id="pl-code-${index}" class="pl-code" placeholder="Shortcode (e.g. fng)" oninput="syncPlaylistsFromDOM()">
-                        <input type="text" value="${pl.url || ''}" id="pl-url-${index}" class="pl-url" placeholder="Full Spotify/YouTube URL" oninput="syncPlaylistsFromDOM()">
-                        <button class="btn-danger" style="margin:0;" onclick="removePlaylistRow(${index})">X</button>
+                    <div class="pl-item">
+                        <input type="text" value="${pl.name || ''}" id="pl-name-${index}" placeholder="Playlist Name" oninput="syncPlaylistsFromDOM()">
+                        <input type="text" value="${pl.shortcode || ''}" id="pl-code-${index}" placeholder="Shortcode" oninput="syncPlaylistsFromDOM()">
+                        <input type="text" value="${pl.url || ''}" id="pl-url-${index}" placeholder="Spotify/YouTube URL" oninput="syncPlaylistsFromDOM()">
+                        <button class="btn-danger" onclick="removePlaylistRow(${index})">X</button>
                     </div>
                 `;
             });
         }
 
-        function addEmptyPlaylistRow() {
-            syncPlaylistsFromDOM();
-            cachedPlaylists.push({ name: '', shortcode: '', url: '' });
-            renderPlaylists();
-        }
-
-        function removePlaylistRow(index) {
-            syncPlaylistsFromDOM();
-            cachedPlaylists.splice(index, 1);
-            renderPlaylists();
-        }
+        function addEmptyPlaylistRow() { syncPlaylistsFromDOM(); cachedPlaylists.push({ name: '', shortcode: '', url: '' }); renderPlaylists(); }
+        function removePlaylistRow(index) { syncPlaylistsFromDOM(); cachedPlaylists.splice(index, 1); renderPlaylists(); }
 
         function savePlaylists() {
             syncPlaylistsFromDOM();
@@ -163,26 +185,13 @@
                 const u = cachedPlaylists[i].url?.trim();
                 if (n && u) newPlaylists.push({ name: n, shortcode: c, url: u });
             }
-            fetch('/api/playlists', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ playlists: newPlaylists })
-            })
-            .then(() => {
-                alert('Playlists and shortcodes saved successfully!');
-                loadConfig();
-            });
+            fetch('/api/playlists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playlists: newPlaylists }) })
+            .then(() => { alert('Playlists and shortcodes saved successfully!'); loadConfig(); });
         }
 
         function updateChannels() {
-            fetch('/api/update-channels', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    panelChannelId: document.getElementById('panelChannelId').value,
-                    logChannelId: document.getElementById('logChannelId').value
-                })
-            }).then(() => alert('Channel Routing saved.'));
+            fetch('/api/update-channels', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ panelChannelId: document.getElementById('panelChannelId').value, logChannelId: document.getElementById('logChannelId').value }) })
+            .then(() => alert('Channel Routing saved.'));
         }
         
         loadConfig();
@@ -195,22 +204,11 @@
             });
         }
 
-        function controlPlayer(action) {
-            fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
-            .then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); });
-        }
-
+        function controlPlayer(action) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) }).then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); }); }
         function moveTrack() {
-            const from = document.getElementById('moveFrom').value;
-            const to = document.getElementById('moveTo').value;
+            const from = document.getElementById('moveFrom').value; const to = document.getElementById('moveTo').value;
             fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move', from, to }) })
             .then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); document.getElementById('moveFrom').value=''; document.getElementById('moveTo').value=''; });
-        }
-
-        function updateExtractors() {
-            if(confirm('Freeze bot and force-update YouTube bypasses?')) {
-                fetch('/api/update-extractors', { method: 'POST' }).then(() => alert('Triggered! Rebooting in 30s.'));
-            }
         }
     </script>
 </body>
