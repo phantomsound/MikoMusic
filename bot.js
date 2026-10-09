@@ -60,14 +60,12 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            // Safely load all default v7 extractors (Spotify, Apple, SoundCloud)
-            // and configure YouTube to use the 'youtube-ext' bridge engine
-            await player.extractors.loadDefault({
-                youtube: { useClient: 'youtube-ext' }
-            });
-
-            console.log("✅ Discord Player v7 Extractors Loaded.");
-        } catch (e) { console.error("Extractor Load Error:", e); }
+            // Unrestricted Native Extractor Load
+            await player.extractors.loadDefault();
+            console.log(`✅ Extractors Loaded Successfully! (${player.extractors.store.size} modules active)`);
+        } catch (e) { 
+            console.error("❌ Extractor Load Error:", e); 
+        }
         
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
         
@@ -129,7 +127,7 @@ function startBot() {
                         leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false 
                     });
                     
-                    if (!queue.connection) await queue.connect(channel);
+                    if (!queue.channel) await queue.connect(channel);
                     
                     const embed = new EmbedBuilder().setColor('#89b4fa').setTitle('🎛️ Miko Music Control Panel').setDescription('*Nothing is currently playing.*');
                     const row1 = new ActionRowBuilder().addComponents(
