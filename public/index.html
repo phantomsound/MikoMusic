@@ -8,24 +8,16 @@
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
         .card { background: #313244; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; }
         .card.full { grid-column: span 2; }
-        input { width: calc(100% - 1rem); padding: 0.5rem; margin: 0.5rem 0; background: #181825; border: 1px solid #45475a; color: white; border-radius: 4px; }
+        input { width: calc(100% - 1rem); padding: 0.5rem; margin: 0.2rem 0; background: #181825; border: 1px solid #45475a; color: white; border-radius: 4px; }
         button { background: #89b4fa; color: #11111b; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 0.5rem; }
         button:hover { background: #74c7ec; }
         .btn-success { background: #a6e3a1; color: #11111b; }
-        .btn-success:hover { background: #94e2d5; }
         .btn-danger { background: #f38ba8; }
-        .btn-danger:hover { background: #eba0ac; }
-        .btn-warning { background: #f9e2af; }
-        .btn-warning:hover { background: #f2cdcd; }
-        ul { list-style: none; padding: 0; }
-        li { background: #181825; padding: 0.5rem; margin-top: 0.5rem; border-radius: 4px; display: flex; justify-content: space-between; }
-        a { color: #89b4fa; text-decoration: none; font-weight: bold; }
-        .help-text { font-size: 0.85rem; color: #a6adc8; margin-bottom: 1rem; display: block; }
-        .controls-row { display: flex; gap: 1rem; margin-top: 1rem; }
-        .audit-table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.9rem; }
-        .audit-table th, .audit-table td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #45475a; }
-        .audit-table th { color: #89b4fa; }
-        .audit-container { max-height: 220px; overflow-y: auto; background: #181825; border-radius: 4px; padding: 0.5rem; }
+        .btn-warning { background: #f9e2af; color:#11111b; }
+        .controls-row { display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; }
+        .pl-item { background: #181825; padding: 0.5rem; margin-top: 0.5rem; border-radius: 4px; display: flex; align-items: center; gap: 0.5rem;}
+        .pl-item input { margin: 0; width: 45%; }
+        .drag-handle { cursor: grab; font-size: 1.2rem; padding: 0 0.5rem; }
     </style>
 </head>
 <body>
@@ -35,113 +27,99 @@
     </div>
     
     <div class="card full" style="border-left: 4px solid #f9e2af;">
-        <h3>Live Audio Overrides & Maintenance</h3>
-        <span class="help-text">Control the active Discord music session directly from this web panel.</span>
+        <h3>Live Audio Overrides</h3>
         <div class="controls-row">
+            <button onclick="controlPlayer('back')">⏮️ Back</button>
             <button onclick="controlPlayer('pause')">⏯️ Play / Pause</button>
-            <button onclick="controlPlayer('skip')">⏭️ Skip Track</button>
+            <button onclick="controlPlayer('skip')">⏭️ Skip</button>
+            <button onclick="controlPlayer('shuffle')" class="btn-warning">🔀 Shuffle Queue</button>
+            <button onclick="controlPlayer('loopTrack')" class="btn-success">🔂 Loop Track</button>
+            <button onclick="controlPlayer('loopQueue')" class="btn-success">🔁 Loop Queue</button>
+            <button onclick="controlPlayer('loopOff')" class="btn-danger">❌ Loop Off</button>
             <button onclick="controlPlayer('stop')" class="btn-danger">⏹️ Stop & Disconnect</button>
         </div>
-        <hr style="border: 1px solid #45475a; margin: 1.5rem 0;">
-        <span class="help-text">If YouTube playback starts failing, force-update extraction libraries.</span>
-        <button onclick="updateExtractors()" class="btn-warning">🔄 Force-Update YouTube Extractors</button>
     </div>
 
     <div class="grid">
         <div class="card">
             <h3>Permissions (Security)</h3>
-            <span class="help-text">Leave blank to allow everyone.</span>
             <label>Admin User IDs:</label>
-            <input type="text" id="adminUsers" placeholder="e.g. 123456789012345678">
+            <input type="text" id="adminUsers">
             <label>Admin Role IDs:</label>
-            <input type="text" id="adminRoles" placeholder="e.g. 112233445566778899">
+            <input type="text" id="adminRoles">
             <button onclick="updateSettings()">Save Permissions</button>
         </div>
 
         <div class="card">
-            <h3>Add Quick Playlist</h3>
-            <span class="help-text">Save a URL for the /summon menu.</span>
-            <input type="text" id="plName" placeholder="Name (e.g., Friday Night Gamers)">
-            <input type="text" id="plUrl" placeholder="Spotify/YouTube URL">
-            <button onclick="updateSettings()">Save to Notepad</button>
-        </div>
-    </div>
-    
-    <div class="card full">
-        <h3>Saved Playlists</h3>
-        <ul id="playlistList"></ul>
-    </div>
-
-    <div class="card full">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h3>Admin Audit Log</h3>
-            <button onclick="loadAudit()" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Refresh Log</button>
-        </div>
-        <div class="audit-container">
-            <table class="audit-table">
-                <thead>
-                    <tr><th>Timestamp</th><th>Action</th><th>Details</th></tr>
-                </thead>
-                <tbody id="auditBody"></tbody>
-            </table>
+            <h3>Playlist Manager (Notepad)</h3>
+            <p style="font-size: 0.85rem; color:#a6adc8;">Edit your saved playlists for the /summon menu below. Click Save to push changes.</p>
+            <div id="plContainer"></div>
+            <button onclick="addEmptyPlaylistRow()" class="btn-success">+ Add Row</button>
+            <button onclick="savePlaylists()">💾 Save All Playlists</button>
         </div>
     </div>
     
     <script>
+        let cachedPlaylists = [];
+
         function loadConfig() {
             fetch('/api/config').then(r => r.json()).then(data => {
                 document.getElementById('adminUsers').value = (data.adminUsers || []).join(', ');
                 document.getElementById('adminRoles').value = (data.adminRoles || []).join(', ');
-                
-                const list = document.getElementById('playlistList');
-                list.innerHTML = '';
-                if(data.savedPlaylists) {
-                    data.savedPlaylists.forEach(pl => { 
-                        list.innerHTML += `<li><span>${pl.name}</span> <a href="${pl.url}" target="_blank">Link</a></li>`; 
-                    });
-                }
+                cachedPlaylists = data.savedPlaylists || [];
+                renderPlaylists();
             });
-            loadAudit();
         }
 
-        function loadAudit() {
-            fetch('/api/audit').then(r => r.json()).then(logs => {
-                const body = document.getElementById('auditBody');
-                body.innerHTML = '';
-                if (!logs.length) {
-                    body.innerHTML = '<tr><td colspan="3" style="color: #6c7086;">No actions recorded yet.</td></tr>';
-                    return;
-                }
-                logs.forEach(l => {
-                    body.innerHTML += `<tr><td>${l.timestamp}</td><td><b>${l.action}</b></td><td>${l.details}</td></tr>`;
-                });
+        function renderPlaylists() {
+            const container = document.getElementById('plContainer');
+            container.innerHTML = '';
+            cachedPlaylists.forEach((pl, index) => {
+                container.innerHTML += `
+                    <div class="pl-item" id="pl-${index}">
+                        <span class="drag-handle">↕️</span>
+                        <input type="text" value="${pl.name}" id="pl-name-${index}" placeholder="Name">
+                        <input type="text" value="${pl.url}" id="pl-url-${index}" placeholder="URL">
+                        <button class="btn-danger" style="margin:0;" onclick="removePlaylistRow(${index})">X</button>
+                    </div>
+                `;
+            });
+        }
+
+        function addEmptyPlaylistRow() {
+            cachedPlaylists.push({ name: '', url: '' });
+            renderPlaylists();
+        }
+
+        function removePlaylistRow(index) {
+            cachedPlaylists.splice(index, 1);
+            renderPlaylists();
+        }
+
+        function savePlaylists() {
+            const newPlaylists = [];
+            for (let i = 0; i < cachedPlaylists.length; i++) {
+                const n = document.getElementById(`pl-name-${i}`)?.value;
+                const u = document.getElementById(`pl-url-${i}`)?.value;
+                if (n && u) newPlaylists.push({ name: n, url: u });
+            }
+            fetch('/api/playlists', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ playlists: newPlaylists })
+            }).then(() => {
+                alert('Playlists saved successfully!');
+                loadConfig();
             });
         }
         
         loadConfig();
         
         function openDiscordInvite() {
-            // Fetch fresh config on click instead of relying on page load
             fetch('/api/config').then(r => r.json()).then(data => {
-                let id = data.clientId;
-                if (!id || id === 'undefined') {
-                    id = prompt("The web server loaded faster than the bot could log in! Please paste your Application ID here manually:");
-                }
-                if (!id) return; // User cancelled prompt
-                
-                const url = `https://discord.com/oauth2/authorize?client_id=${id}&permissions=3148800&scope=bot%20applications.commands`;
-                const width = 500, height = 750;
-                const left = (screen.width - width) / 2;
-                const top = (screen.height - height) / 2;
-                
-                const popup = window.open(url, 'discordAuthPopup', `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,resizable=yes`);
-                
-                const checker = setInterval(() => {
-                    if (!popup || popup.closed) {
-                        clearInterval(checker);
-                        loadConfig();
-                    }
-                }, 1000);
+                const id = data.clientId || prompt("Paste your Application ID:");
+                if (!id) return; 
+                window.open(`https://discord.com/oauth2/authorize?client_id=${id}&permissions=3148800&scope=bot%20applications.commands`, 'popup', 'width=500,height=750');
             });
         }
 
@@ -151,34 +129,14 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     adminUsers: document.getElementById('adminUsers').value,
-                    adminRoles: document.getElementById('adminRoles').value,
-                    newPlaylistName: document.getElementById('plName').value,
-                    newPlaylistUrl: document.getElementById('plUrl').value
+                    adminRoles: document.getElementById('adminRoles').value
                 })
-            }).then(() => {
-                document.getElementById('plName').value = '';
-                document.getElementById('plUrl').value = '';
-                loadConfig();
-            });
+            }).then(() => alert('Permissions saved.'));
         }
 
         function controlPlayer(action) {
-            fetch('/api/control', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action })
-            }).then(r => r.json()).then(res => {
-                if(!res.success) alert(res.message);
-                loadAudit();
-            });
-        }
-
-        function updateExtractors() {
-            if(confirm('This will freeze the bot for ~30 seconds while npm updates packages, then restart it. Proceed?')) {
-                fetch('/api/update-extractors', { method: 'POST' }).then(() => {
-                    alert('Update triggered! Give the bot about 30 seconds to reboot.');
-                }).catch(() => alert('Bot is rebooting...'));
-            }
+            fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
+            .then(r => r.json()).then(res => { if(!res.success) alert(res.message); });
         }
     </script>
 </body>
