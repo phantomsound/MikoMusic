@@ -72,9 +72,8 @@ function startBot() {
     const player = new Player(client);
     client.player = player;
     
-    // Explicit Error and Skip Logging so we can see Google's 403 blocks in the console
     player.events.on('error', (q, e) => console.log('Player Error:', e.message));
-    player.events.on('playerError', (q, e) => console.log('Audio Stream Blocked (403):', e.message));
+    player.events.on('playerError', (q, e) => console.log('Audio Stream Blocked:', e.message));
     player.events.on('playerSkip', (q, track) => console.log(`Panic Skipped Blocked Track: ${track.title}`));
     
     player.events.on('playerStart', (queue, track) => { logNowPlaying(queue.guild, track); updatePanel(queue); });
@@ -87,16 +86,29 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            // 1. Load native extractors, but explicitly BLOCK the broken default YouTube engine
-            await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
+            const { DefaultExtractors } = require('@discord-player/extractor');
             
-            // 2. Inject the Android TV / youtubei bypass engine
-            const { YoutubeiExtractor } = require("discord-player-youtubei");
-            await player.extractors.register(YoutubeiExtractor, {});
+            // 1. Securely bind the Android TV bypass engine so Spotify has a bridge
+            let YTExtractor;
+            try {
+                const ytPkg = require('discord-player-youtubei');
+                YTExtractor = ytPkg.YoutubeiExtractor || ytPkg.default || ytPkg;
+            } catch (err) {
+                console.error("Android TV Engine Missing:", err.message);
+            }
+
+            if (YTExtractor) {
+                await player.extractors.register(YTExtractor, {});
+                console.log('✅ Android TV Engine (YoutubeiExtractor) Registered.');
+            }
+
+            // 2. Load the official v7 Extractors (Spotify, Apple) while stripping the broken legacy YouTube module
+            const safeExtractors = DefaultExtractors.filter(ext => ext.name !== 'YouTubeExtractor');
+            await player.extractors.loadMulti(safeExtractors);
             
-            console.log(`✅ Android TV Bypass Engaged & Extractors Loaded.`);
+            console.log(`✅ Native v7 Extractors Active: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
         } catch (e) {
-            console.error("Extractor Setup Warning:", e.message);
+            console.error("Extractor Setup Crash:", e.stack);
         }
         
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
