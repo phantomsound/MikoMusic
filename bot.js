@@ -1,7 +1,5 @@
 ﻿const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
 const { Player, QueueRepeatMode } = require('discord-player');
-const { DefaultExtractors } = require('@discord-player/extractor');
-const { YoutubeiExtractor } = require('discord-player-youtubei');
 const fs = require('fs');
 
 function getConfig() {
@@ -62,11 +60,13 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            // v7 Extractor Architecture: Load defaults, explicitly bypass broken YouTube, and register YouTubei API
-            const safeExtractors = DefaultExtractors.filter(ext => ext.name !== 'YouTubeExtractor');
-            await player.extractors.loadMulti(safeExtractors);
-            await player.extractors.register(YoutubeiExtractor, {});
-            console.log("✅ Discord Player v7 Architecture & YouTubei Bypass Loaded.");
+            // Safely load all default v7 extractors (Spotify, Apple, SoundCloud)
+            // and configure YouTube to use the 'youtube-ext' bridge engine
+            await player.extractors.loadDefault({
+                youtube: { useClient: 'youtube-ext' }
+            });
+
+            console.log("✅ Discord Player v7 Extractors Loaded.");
         } catch (e) { console.error("Extractor Load Error:", e); }
         
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
