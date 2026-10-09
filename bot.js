@@ -1,7 +1,10 @@
 ﻿const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
-const { Player, QueueRepeatMode, Track, Playlist } = require('discord-player');
-const playdl = require('play-dl');
+const { Player, QueueRepeatMode, Track, Playlist, QueryType } = require('discord-player');
 const fs = require('fs');
+
+const fetch = require('isomorphic-unfetch');
+const spotify = require('spotify-url-info')(fetch);
+const ytext = require('youtube-ext');
 
 function getConfig() {
     try { return JSON.parse(fs.readFileSync('./config.json', 'utf-8')); } catch (e) { return {}; }
@@ -59,13 +62,7 @@ function startBot() {
     player.events.on('disconnect', (queue) => updatePanel(queue));
 
     client.once('clientReady', async () => {
-        try {
-            await player.extractors.loadDefault({
-                youtube: { useClient: 'play-dl' }
-            });
-            console.log("✅ Play-DL Audio Stream Engine Loaded.");
-        } catch (e) { console.error("Extractor Load Error:", e); }
-        
+        try { await player.extractors.loadDefault(); } catch (e) { }
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
         
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
@@ -88,79 +85,106 @@ function startBot() {
             let playTarget = null;
             let queryTitle = '';
 
-            // ABSOLUTE BYPASS: Intercept YouTube links and manually construct metadata
-            if (safeQuery.includes('youtube.com') || safeQuery.includes('youtu.be')) {
-                safeQuery = safeQuery.replace('music.youtube.com', 'www.youtube.com');
-                try { const u = new URL(safeQuery); u.searchParams.delete('si'); safeQuery = u.toString(); } catch(e) {}
-
-                console.log(`[Bypass] Intercepting URL for direct play-dl extraction...`);
+            // 1. STEALTH INTERCEPTOR: Spotify
+            if (safeQuery.includes('spotify.com')) {
+                console.log("[Stealth] Routing Spotify via embed interceptor...");
                 try {
-                    if (safeQuery.includes('list=')) {
-                        const playlistData = await playdl.playlist_info(safeQuery, { incomplete: true });
-                        const videos = await playlistData.all_videos();
-                        
-                        if (videos.length > 0) {
-                            const customPlaylist = new Playlist(player, {
-                                title: playlistData.title,
-                                description: playlistData.title,
-                                thumbnail: playlistData.thumbnail?.url || playlistData.thumbnail || '',
-                                type: 'playlist',
-                                source: 'youtube',
-                                author: { name: playlistData.channel?.name || 'YouTube' },
-                                tracks: [],
-                                id: playlistData.id,
-                                url: playlistData.url
-                            });
-
-                            const customTracks = videos.map(v => new Track(player, {
-                                title: v.title,
-                                author: v.channel?.name || 'Unknown',
-                                url: v.url,
-                                thumbnail: v.thumbnails?.[0]?.url || v.thumbnail || '',
-                                duration: v.durationRaw,
-                                views: v.views,
-                                requestedBy: interaction.user,
-                                source: 'youtube'
-                            }));
-                            
-                            customPlaylist.tracks = customTracks;
-                            customTracks.forEach(t => t.playlist = customPlaylist);
-                            
-                            playTarget = customPlaylist;
-                            queryTitle = customPlaylist.title;
-                        }
-                    } else {
-                        const videoData = (await playdl.video_info(safeQuery)).video_details;
-                        playTarget = new Track(player, {
-                            title: videoData.title,
-                            author: videoData.channel?.name,
-                            url: videoData.url,
-                            thumbnail: videoData.thumbnails?.[0]?.url || videoData.thumbnail || '',
-                            duration: videoData.durationRaw,
-                            views: videoData.views,
+                    const data = await spotify.getData(safeQuery);
+                    if (data.type === 'playlist' || data.type === 'album') {
+                        const tracksData = await spotify.getTracks(safeQuery);
+                        const customPlaylist = new Playlist(player, {
+                            title: data.name,
+                            thumbnail: data.coverArt?.sources?.[0]?.url || '',
+                            type: 'playlist',
+                            source: 'spotify',
+                            author: { name: data.owner?.name || data.artists?.[0]?.name || 'Spotify' },
+                            tracks: [],
+                            url: safeQuery
+                        });
+                        const customTracks = tracksData.map(t => new Track(player, {
+                            title: t.name,
+                            author: t.artists?.[0]?.name || 'Unknown',
+                            url: t.external_urls?.spotify || safeQuery,
                             requestedBy: interaction.user,
-                            source: 'youtube'
+                            source: 'spotify',
+                            queryType: QueryType.SPOTIFY_TRACK
+                        }));
+                        customPlaylist.tracks = customTracks;
+                        customTracks.forEach(t => t.playlist = customPlaylist);
+                        playTarget = customPlaylist;
+                        queryTitle = customPlaylist.title;
+                    } else {
+                        playTarget = new Track(player, {
+                            title: data.name,
+                            author: data.artists?.[0]?.name || 'Unknown',
+                            url: safeQuery,
+                            requestedBy: interaction.user,
+                            source: 'spotify',
+                            queryType: QueryType.SPOTIFY_TRACK
                         });
                         queryTitle = playTarget.title;
                     }
-                } catch (e) {
-                    console.error("Play-DL Direct Extraction Error:", e.message);
-                }
+                } catch(e) { console.error("Spotify Intercept Error:", e.message); }
+            } 
+            
+            // 2. STEALTH INTERCEPTOR: YouTube
+            else if (safeQuery.includes('youtube.com') || safeQuery.includes('youtu.be')) {
+                console.log("[Stealth] Routing YouTube via iOS App Simulator...");
+                safeQuery = safeQuery.replace('music.youtube.com', 'www.youtube.com');
+                try { const u = new URL(safeQuery); u.searchParams.delete('si'); safeQuery = u.toString(); } catch(e) {}
+                
+                try {
+                    if (safeQuery.includes('list=')) {
+                        const listData = await ytext.playlistInfo(safeQuery);
+                        const customPlaylist = new Playlist(player, {
+                            title: listData.title,
+                            type: 'playlist',
+                            source: 'youtube',
+                            author: { name: listData.channel?.name || 'YouTube' },
+                            tracks: [],
+                            url: safeQuery
+                        });
+                        const customTracks = listData.videos.map(v => new Track(player, {
+                            title: v.title,
+                            author: v.channel?.name || 'Unknown',
+                            url: v.url,
+                            requestedBy: interaction.user,
+                            source: 'youtube',
+                            queryType: QueryType.YOUTUBE_VIDEO
+                        }));
+                        customPlaylist.tracks = customTracks;
+                        customTracks.forEach(t => t.playlist = customPlaylist);
+                        playTarget = customPlaylist;
+                        queryTitle = customPlaylist.title;
+                    } else {
+                        const videoData = await ytext.videoInfo(safeQuery);
+                        playTarget = new Track(player, {
+                            title: videoData.title,
+                            author: videoData.channel?.name || 'Unknown',
+                            url: videoData.url,
+                            requestedBy: interaction.user,
+                            source: 'youtube',
+                            queryType: QueryType.YOUTUBE_VIDEO
+                        });
+                        queryTitle = playTarget.title;
+                    }
+                } catch(e) { console.error("YouTube Intercept Error:", e.message); }
             }
 
-            // Fallback to default discord-player engine if not YouTube, or if the bypass failed
+            // 3. FALLBACK: Direct Search
             if (!playTarget) {
+                console.log("[Fallback] Searching raw query...");
                 const result = await player.search(safeQuery, { requestedBy: interaction.user });
                 if (!result || !result.hasTracks()) {
-                    return interaction.followUp(`❌ No tracks found for: ${safeQuery}\n*(YouTube IP Block active or Playlist is Private)*`);
+                    return interaction.followUp(`❌ No tracks found for: ${safeQuery}`);
                 }
                 playTarget = result;
                 queryTitle = result.playlist ? result.playlist.title : result.tracks[0].title;
             }
             
+            // 4. INJECT TO QUEUE
             const queue = player.nodes.create(interaction.guild, { metadata: { channel: interaction.channel, panelMessage: null }, leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false });
             if (!queue.connection) await queue.connect(channel);
-            
             await player.play(channel, playTarget, { nodeOptions: { metadata: queue.metadata } });
             
             const aliasTag = matchedMacro ? ` *(shortcode: ${matchedMacro.shortcode})*` : '';
