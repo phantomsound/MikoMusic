@@ -69,12 +69,15 @@ async function ensureStandbyBanner(client) {
 
 function startBot() {
     const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
-    const player = new Player(client);
+    
+    const player = new Player(client, {
+        ytdlOptions: { quality: 'highestaudio', highWaterMark: 1 << 25 }
+    });
     client.player = player;
     
     player.events.on('error', (q, e) => console.log('Player Error:', e.message));
-    player.events.on('playerError', (q, e) => console.log('Audio Stream Blocked:', e.message));
-    player.events.on('playerSkip', (q, track) => console.log(`Panic Skipped Blocked Track: ${track.title}`));
+    player.events.on('playerError', (q, e) => console.log('Stream Blocked:', e.message));
+    player.events.on('playerSkip', (q, track) => console.log(`Skipped Track: ${track.title}`));
     
     player.events.on('playerStart', (queue, track) => { logNowPlaying(queue.guild, track); updatePanel(queue); });
     player.events.on('audioTrackAdd', (queue) => updatePanel(queue));
@@ -85,24 +88,53 @@ function startBot() {
     player.events.on('volumeChange', (queue) => updatePanel(queue));
 
     client.once('clientReady', async () => {
+        const { SpotifyExtractor, AppleMusicExtractor, SoundCloudExtractor, YouTubeExtractor } = require('@discord-player/extractor');
+        let bridgeLoaded = false;
+
+        // TIER 1: Android TV Bypass (VEVO/DRM Immune)
         try {
-            // 1. Explicitly load Android TV Bypass Engine
-            const { YoutubeiExtractor } = require('discord-player-youtubei');
-            await player.extractors.register(YoutubeiExtractor, {});
-            console.log('✅ Android TV Engine Registered.');
-
-            // 2. Load Official v7 Extractors
-            const { SpotifyExtractor, AppleMusicExtractor, SoundCloudExtractor } = require('@discord-player/extractor');
-            
-            // 3. EXPLICITLY MAP Spotify to use the Android TV Engine as its Bridge (Prevents SoundCloud fallback!)
-            await player.extractors.register(SpotifyExtractor, { bridgeProvider: YoutubeiExtractor });
-            await player.extractors.register(AppleMusicExtractor, { bridgeProvider: YoutubeiExtractor });
-            await player.extractors.register(SoundCloudExtractor, {});
-
-            console.log(`✅ Extractors Active and Spotify is explicitly locked to TV Spoofing Bridge!`);
-        } catch (e) {
-            console.error("Extractor Setup Crash:", e.stack);
+            const pkg = require('discord-player-youtubei');
+            const YoutubeiExt = pkg.YoutubeiExtractor || pkg.default;
+            if (YoutubeiExt) {
+                // Dynamically patch the missing developer tag that caused the crash
+                if (!YoutubeiExt.identifier) YoutubeiExt.identifier = 'YoutubeiExtractor';
+                await player.extractors.register(YoutubeiExt, {});
+                await player.extractors.register(SpotifyExtractor, { bridgeProvider: YoutubeiExt });
+                await player.extractors.register(AppleMusicExtractor, { bridgeProvider: YoutubeiExt });
+                console.log('✅ TIER 1: Android TV Spoofing Engaged. Spotify locked.');
+                bridgeLoaded = true;
+            }
+        } catch (err) {
+            console.log('⚠️ Android TV bypass crashed, failing over to Tier 2...');
         }
+
+        // TIER 2: Official YouTube-Ext (IP Ban Evasion)
+        if (!bridgeLoaded) {
+            try {
+                await player.extractors.register(YouTubeExtractor, { useClient: 'youtube-ext' });
+                await player.extractors.register(SpotifyExtractor, { bridgeProvider: YouTubeExtractor });
+                await player.extractors.register(AppleMusicExtractor, { bridgeProvider: YouTubeExtractor });
+                console.log('✅ TIER 2: Default YouTube-Ext Bridge Engaged. Spotify locked.');
+                bridgeLoaded = true;
+            } catch (err) {
+                console.log('⚠️ Tier 2 unavailable, failing over to Tier 3...');
+            }
+        }
+        
+        // TIER 3: Play-DL (Absolute Fallback)
+        if (!bridgeLoaded) {
+            try {
+                await player.extractors.register(YouTubeExtractor, { useClient: 'play-dl' });
+                await player.extractors.register(SpotifyExtractor, { bridgeProvider: YouTubeExtractor });
+                await player.extractors.register(AppleMusicExtractor, { bridgeProvider: YouTubeExtractor });
+                console.log('✅ TIER 3: Play-DL Bridge Engaged. Spotify locked.');
+            } catch (err) {
+                console.log('❌ FATAL: All routing failed.');
+            }
+        }
+
+        // Register final standalone extractors
+        try { await player.extractors.register(SoundCloudExtractor, {}); } catch(e){}
         
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
         await ensureStandbyBanner(client);
