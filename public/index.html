@@ -2,59 +2,76 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Miko Music - Admin</title>
     <style>
-        :root { --bg: #1e1e2e; --card: #313244; --input: #181825; --border: #45475a; --text: #cdd6f4; --blue: #89b4fa; --green: #a6e3a1; --red: #f38ba8; --yellow: #f9e2af; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); padding: 2rem; max-width: 1000px; margin: 0 auto; }
-        .grid-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-        .card { background: var(--card); padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; }
-        .card.full { grid-column: span 2; }
-        input, select { padding: 0.6rem; background: var(--input); border: 1px solid var(--border); color: var(--text); border-radius: 4px; box-sizing: border-box; width: 100%; }
-        button { background: var(--blue); color: #11111b; padding: 0.6rem 1.2rem; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 0.5rem; transition: opacity 0.2s; }
-        button:hover { opacity: 0.8; }
-        .btn-success { background: var(--green); } .btn-danger { background: var(--red); } .btn-warning { background: var(--yellow); } .btn-secondary { background: var(--border); color: white; }
-        .help-text { font-size: 0.85rem; color: #a6adc8; margin-bottom: 1rem; display: block; }
-        .controls-row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
-        .overrides-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 1rem; }
-        .overrides-grid button { margin: 0; width: 100%; }
-        .pl-item { display: grid; grid-template-columns: 2fr 1.5fr 4fr 50px; gap: 10px; background: var(--input); padding: 0.8rem; border-radius: 6px; margin-top: 0.5rem; align-items: center; }
-        .pl-item input { margin: 0; }
-        .pl-item button { margin: 0; padding: 0.6rem; }
-        .move-box { display: flex; gap: 0.5rem; align-items: center; margin-top: 1rem; background: var(--input); padding: 0.8rem; border-radius: 6px; }
-        .move-box input { width: 80px; margin: 0; }
-        .queue-item { padding: 0.4rem 0; border-bottom: 1px solid var(--border); font-size: 0.95rem; }
+        :root { 
+            --bg: #1e1e2e; --card: #282a36; --card-alt: #313244; 
+            --input: #181825; --border: #45475a; --text: #cdd6f4; 
+            --blue: #89b4fa; --green: #a6e3a1; --red: #f38ba8; --yellow: #f9e2af; 
+        }
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; max-width: 1040px; margin: 0 auto; line-height: 1.4; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+        .grid-layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; }
+        .card { background: var(--card); padding: 1.4rem; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.15); margin-bottom: 1.5rem; }
+        .card.full { width: 100%; margin-bottom: 1.5rem; }
+        h1, h2, h3 { margin: 0 0 0.5rem 0; }
+        input, select { padding: 0.65rem; background: var(--input); border: 1px solid var(--border); color: var(--text); border-radius: 6px; width: 100%; font-size: 0.95rem; }
+        input:focus, select:focus { outline: none; border-color: var(--blue); }
+        button { background: var(--blue); color: #11111b; padding: 0.65rem 1.1rem; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: filter 0.15s ease; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; }
+        button:hover { filter: brightness(1.15); }
+        .btn-success { background: var(--green); } .btn-danger { background: var(--red); color: #11111b; } .btn-warning { background: var(--yellow); } .btn-secondary { background: var(--card-alt); color: var(--text); border: 1px solid var(--border); }
+        .help-text { font-size: 0.82rem; color: #a6adc8; margin-bottom: 0.8rem; display: block; }
+        
+        .overrides-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 1rem; }
+        @media (max-width: 700px) { .overrides-grid { grid-template-columns: repeat(2, 1fr); } }
+        .overrides-grid button { width: 100%; padding: 0.75rem; }
+
+        .pl-item { display: grid; grid-template-columns: 2fr 1.2fr 3.5fr 45px; gap: 10px; background: var(--input); padding: 0.75rem; border-radius: 6px; margin-top: 0.5rem; align-items: center; border: 1px solid var(--border); }
+        .pl-item button { padding: 0.65rem; }
+
+        .queue-container { max-height: 220px; overflow-y: auto; background: var(--input); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; margin-top: 0.5rem; }
+        .queue-item { display: flex; align-items: center; gap: 10px; padding: 0.55rem 0.75rem; background: var(--card); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 6px; cursor: grab; user-select: none; transition: background 0.15s, transform 0.15s; }
+        .queue-item:hover { background: var(--card-alt); }
+        .queue-item.dragging { opacity: 0.4; transform: scale(0.98); }
+        .drag-handle { color: #6c7086; cursor: grab; font-size: 1.1rem; }
+        .queue-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.92rem; }
+
+        .move-box { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.8rem; background: var(--input); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border); }
+        .move-box input { width: 75px; text-align: center; }
     </style>
 </head>
 <body>
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+    <div class="header">
         <div>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <h1 id="dashTitle" style="margin: 0;">Miko Music Dashboard</h1>
-                <button onclick="editDashName()" style="margin:0; padding: 4px 8px; font-size: 0.8rem;" class="btn-secondary">✏️ Rename</button>
+                <h1 id="dashTitle">Miko Music Dashboard</h1>
+                <button onclick="editDashName()" class="btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;">✏️ Rename</button>
             </div>
-            <span id="serverBadge" style="color: var(--green); font-size: 0.9rem; font-weight: bold; margin-top: 5px; display: inline-block;">📡 Active Server: Loading...</span>
+            <span id="serverBadge" style="color: var(--green); font-size: 0.88rem; font-weight: bold;">📡 Active Server: Loading...</span>
         </div>
         <button class="btn-success" onclick="openDiscordInvite()">➕ Invite Bot to Server</button>
     </div>
     
     <div class="card full" style="border-left: 4px solid var(--blue);">
         <h3>📡 Remote Voice Connection</h3>
-        <span class="help-text">Instantly connect or disconnect the bot from your server without using Discord commands.</span>
-        <div class="controls-row">
-            <select id="voiceChannelSelect" style="max-width: 300px; margin: 0;">
+        <span class="help-text">Instantly summon or disconnect the bot from voice channels without touching Discord.</span>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <select id="voiceChannelSelect" style="max-width: 320px;">
                 <option value="">-- Select Voice Channel --</option>
             </select>
-            <button onclick="manageVoice('join')" class="btn-success" style="margin: 0;">🔊 Join Channel</button>
-            <button onclick="manageVoice('disconnect')" class="btn-danger" style="margin: 0;">🔇 Disconnect</button>
+            <button onclick="manageVoice('join')" class="btn-success">🔊 Join Channel</button>
+            <button onclick="manageVoice('disconnect')" class="btn-danger">🔇 Disconnect</button>
         </div>
     </div>
     
     <div class="card full" style="border-left: 4px solid var(--yellow);">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-            <h3 style="margin: 0;">Live Audio Overrides & Maintenance</h3>
-            <div style="display: flex; align-items: center; gap: 10px; background: var(--input); padding: 0.5rem 1rem; border-radius: 20px;">
-                <span>🔊 Volume: <span id="volLabel">100</span>%</span>
-                <input type="range" id="volSlider" min="0" max="200" value="100" onchange="setVolume()" style="width: 150px; margin: 0;">
+            <h3 style="margin: 0;">Live Audio Overrides & Controls</h3>
+            <div style="display: flex; align-items: center; gap: 10px; background: var(--input); padding: 0.4rem 0.9rem; border-radius: 20px; border: 1px solid var(--border);">
+                <span>🔊 Volume: <b id="volLabel">100</b>%</span>
+                <input type="range" id="volSlider" min="0" max="200" value="100" onchange="setVolume()" style="width: 140px; cursor: pointer;">
             </div>
         </div>
         <div class="overrides-grid">
@@ -70,43 +87,44 @@
     </div>
 
     <div class="grid-layout">
-        <div class="card">
+        <div class="card" style="margin-bottom: 0;">
             <h3>Discord Channel Routing</h3>
-            <span class="help-text">Select where the bot operates and sends logs.</span>
-            <label style="display:block; margin-top:10px;">Dedicated /summon Panel Channel:</label>
+            <span class="help-text">Configure dedicated panel display and notification log targets.</span>
+            <label style="display:block; margin-top:8px; font-weight:600; font-size:0.88rem;">Dedicated Command / Panel Channel:</label>
             <select id="panelChannelId"><option value="">-- No Restriction (Anywhere) --</option></select>
-            <label style="display:block; margin-top:10px;">Notification Log Channel (Now Playing, etc.):</label>
+            <label style="display:block; margin-top:12px; font-weight:600; font-size:0.88rem;">Notification Log Channel (Now Playing):</label>
             <select id="logChannelId"><option value="">-- Do Not Send Logs --</option></select>
-            <button onclick="updateChannels()">Save Routing</button>
+            <button onclick="updateChannels()" style="margin-top: 1rem; width: 100%;">💾 Save Channel Routing</button>
         </div>
 
-        <div class="card">
-            <h3>Live Queue & Remote Play</h3>
-            <span class="help-text">View the active queue or remotely queue a song from here.</span>
+        <div class="card" style="margin-bottom: 0;">
+            <h3>Live Queue Management</h3>
+            <span class="help-text">Drag items by handle ☰ to reorder, or use manual inputs.</span>
             
-            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-                <input type="text" id="remotePlayInput" placeholder="Enter URL or shortcode..." style="flex: 1; margin: 0;">
-                <button class="btn-success" onclick="remotePlay()" style="margin: 0;">▶️ Queue</button>
+            <div style="display: flex; gap: 8px; margin-bottom: 0.8rem;">
+                <input type="text" id="remotePlayInput" placeholder="Queue track URL or shortcode (e.g., fng)..." style="flex: 1;">
+                <button class="btn-success" onclick="remotePlay()">▶️ Play</button>
             </div>
 
-            <div id="activeNowPlaying" style="color: var(--green); font-weight: bold; margin-bottom: 0.5rem;">Nothing Playing</div>
-            <div id="queueContainer" style="max-height: 180px; overflow-y: auto; background: var(--input); padding: 0.5rem; border-radius: 4px;"></div>
+            <div id="activeNowPlaying" style="color: var(--green); font-weight: bold; margin-bottom: 0.4rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">▶️ Nothing Playing</div>
+            
+            <div class="queue-container" id="queueContainer"></div>
             
             <div class="move-box">
-                <span>Move #</span>
+                <span style="font-size:0.88rem;">Move #</span>
                 <input type="number" id="moveFrom" min="1">
-                <span>to #</span>
+                <span style="font-size:0.88rem;">to #</span>
                 <input type="number" id="moveTo" min="1">
-                <button onclick="moveTrack()" class="btn-success" style="margin: 0;">Move</button>
+                <button onclick="manualMoveTrack()" class="btn-success" style="padding: 0.65rem 1rem;">Move</button>
             </div>
         </div>
     </div>
     
-    <div class="card full">
-        <h3>Playlist Manager & Macros (Notepad)</h3>
-        <p class="help-text">Set an optional shortcode (e.g., <code>fng</code>) to instantly queue the associated URL.</p>
+    <div class="card full" style="margin-top: 1.5rem;">
+        <h3>Playlist Manager & Hot-Load Macros</h3>
+        <span class="help-text">Assign a shortcode (e.g., <code>fng</code>) to instantly queue the target Spotify or YouTube playlist.</span>
         <div id="plContainer"></div>
-        <div style="margin-top: 1rem;">
+        <div style="margin-top: 1rem; display: flex; gap: 10px;">
             <button onclick="addEmptyPlaylistRow()" class="btn-success">+ Add Row</button>
             <button onclick="savePlaylists()">💾 Save All Playlists</button>
         </div>
@@ -115,6 +133,11 @@
     <script>
         let cachedPlaylists = [];
         let isFirstLoad = true;
+        let draggedIndex = null;
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag]));
+        }
 
         function loadConfig() {
             fetch('/api/server-info').then(r => r.json()).then(data => {
@@ -152,9 +175,21 @@
 
         function refreshQueue() {
             fetch('/api/queue').then(r => r.json()).then(data => {
-                document.getElementById('activeNowPlaying').innerText = data.current ? `▶️ ${data.current}` : 'Nothing Playing';
+                document.getElementById('activeNowPlaying').innerText = data.current ? `▶️ Now Playing: ${data.current}` : '▶️ Nothing Playing';
                 const qc = document.getElementById('queueContainer');
-                qc.innerHTML = data.tracks.length ? data.tracks.map(t => `<div class="queue-item"><b>${t.index}.</b> ${t.title}</div>`).join('') : '<span class="help-text">Queue is empty.</span>';
+                
+                if (!data.tracks || !data.tracks.length) {
+                    qc.innerHTML = '<div style="color:#6c7086; padding:0.5rem; font-size:0.9rem;">Queue is empty.</div>';
+                } else {
+                    qc.innerHTML = data.tracks.map(t => `
+                        <div class="queue-item" draggable="true" data-index="${t.index}">
+                            <span class="drag-handle">☰</span>
+                            <span style="font-weight: bold; width: 22px;">${t.index}.</span>
+                            <span class="queue-title">${escapeHTML(t.title)}</span>
+                        </div>
+                    `).join('');
+                    bindDragEvents();
+                }
                 
                 if (isFirstLoad && data.volume !== undefined) {
                     document.getElementById('volSlider').value = data.volume;
@@ -164,7 +199,47 @@
             });
         }
 
-        setInterval(refreshQueue, 3000);
+        function bindDragEvents() {
+            const items = document.querySelectorAll('.queue-item');
+            items.forEach(item => {
+                item.addEventListener('dragstart', (e) => {
+                    draggedIndex = parseInt(item.getAttribute('data-index'));
+                    item.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+                item.addEventListener('dragend', () => item.classList.remove('dragging'));
+                item.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                });
+                item.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const targetIndex = parseInt(item.getAttribute('data-index'));
+                    if (draggedIndex && targetIndex && draggedIndex !== targetIndex) {
+                        moveTrackApi(draggedIndex, targetIndex);
+                    }
+                });
+            });
+        }
+
+        function moveTrackApi(from, to) {
+            fetch('/api/control', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ action: 'move', from, to }) 
+            }).then(() => refreshQueue());
+        }
+
+        function manualMoveTrack() {
+            const from = document.getElementById('moveFrom').value;
+            const to = document.getElementById('moveTo').value;
+            if (!from || !to) return;
+            moveTrackApi(parseInt(from), parseInt(to));
+            document.getElementById('moveFrom').value = '';
+            document.getElementById('moveTo').value = '';
+        }
+
+        setInterval(refreshQueue, 3500);
 
         function editDashName() {
             const newName = prompt("Enter new dashboard name:", document.getElementById('dashTitle').innerText);
@@ -215,8 +290,8 @@
                     <div class="pl-item">
                         <input type="text" value="${pl.name || ''}" id="pl-name-${index}" placeholder="Playlist Name" oninput="syncPlaylistsFromDOM()">
                         <input type="text" value="${pl.shortcode || ''}" id="pl-code-${index}" placeholder="Shortcode" oninput="syncPlaylistsFromDOM()">
-                        <input type="text" value="${pl.url || ''}" id="pl-url-${index}" placeholder="Spotify/YouTube URL" oninput="syncPlaylistsFromDOM()">
-                        <button class="btn-danger" onclick="removePlaylistRow(${index})">X</button>
+                        <input type="text" value="${pl.url || ''}" id="pl-url-${index}" placeholder="Spotify or YouTube URL" oninput="syncPlaylistsFromDOM()">
+                        <button class="btn-danger" onclick="removePlaylistRow(${index})">✕</button>
                     </div>
                 `;
             });
@@ -239,12 +314,10 @@
         }
 
         function updateChannels() {
-            fetch('/api/update-channels', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ panelChannelId: document.getElementById('panelChannelId').value, logChannelId: document.getElementById('logChannelId').value }) })
+            fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ panelChannelId: document.getElementById('panelChannelId').value, logChannelId: document.getElementById('logChannelId').value }) })
             .then(() => alert('Channel Routing saved.'));
         }
-        
-        loadConfig();
-        
+
         function openDiscordInvite() {
             fetch('/api/config').then(r => r.json()).then(data => {
                 const id = data.clientId || prompt("Paste your Application ID:");
@@ -253,12 +326,12 @@
             });
         }
 
-        function controlPlayer(action) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) }).then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); }); }
-        function moveTrack() {
-            const from = document.getElementById('moveFrom').value; const to = document.getElementById('moveTo').value;
-            fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move', from, to }) })
-            .then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); document.getElementById('moveFrom').value=''; document.getElementById('moveTo').value=''; });
+        function controlPlayer(action) {
+            fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
+            .then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); });
         }
+
+        loadConfig();
     </script>
 </body>
 </html>

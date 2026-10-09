@@ -1,7 +1,13 @@
 ﻿const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
 const { Player, QueueRepeatMode } = require('discord-player');
-const { SpotifyExtractor, AppleMusicExtractor, YouTubeExtractor, SoundCloudExtractor } = require('@discord-player/extractor');
+const { SpotifyExtractor, AppleMusicExtractor, SoundCloudExtractor } = require('@discord-player/extractor');
 const fs = require('fs');
+
+let YoutubeiExtractor;
+try {
+    const ytPkg = require('discord-player-youtubei');
+    YoutubeiExtractor = ytPkg.YoutubeiExtractor || ytPkg.default || ytPkg;
+} catch (e) {}
 
 function getConfig() {
     try { return JSON.parse(fs.readFileSync('./config.json', 'utf-8')); } catch (e) { return {}; }
@@ -37,11 +43,35 @@ async function updatePanel(queue) {
             const mode = queue.repeatMode === QueueRepeatMode.TRACK ? 'Track' : queue.repeatMode === QueueRepeatMode.QUEUE ? 'Queue' : 'Off';
             embed.setFooter({ text: `Queue: ${queue.tracks.size} tracks | Loop: ${mode} | Vol: ${queue.node.volume}%` });
         } else {
-            embed.setDescription('*Nothing is currently playing. Add a song to get started!*');
+            embed.setDescription('*Nothing is currently playing. Add a track or playlist below!*');
             embed.setFooter({ text: 'Queue is empty' });
         }
         await queue.metadata.panelMessage.edit({ embeds: [embed] });
     } catch(e) { }
+}
+
+async function ensureStandbyBanner(client) {
+    const config = getConfig();
+    if (!config.panelChannelId) return;
+    try {
+        const channel = client.channels.cache.get(config.panelChannelId);
+        if (!channel || !channel.isTextBased()) return;
+
+        const messages = await channel.messages.fetch({ limit: 15 });
+        const existing = messages.find(m => m.author.id === client.user.id && m.components.some(r => r.components.some(c => c.customId === 'btn_summon_standby')));
+        
+        if (!existing) {
+            const embed = new EmbedBuilder()
+                .setColor('#89b4fa')
+                .setTitle('🎵 Miko Music Command Center')
+                .setDescription('Click below to summon the music bot into your voice channel without typing any commands.');
+            
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('btn_summon_standby').setLabel('🔊 Summon to Voice Channel').setStyle(ButtonStyle.Success)
+            );
+            await channel.send({ embeds: [embed], components: [row] });
+        }
+    } catch(e) {}
 }
 
 function startBot() {
@@ -61,32 +91,68 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            // 1. Register SoundCloud FIRST so it can act as the core audio bridge
+            if (YoutubeiExtractor && typeof YoutubeiExtractor === 'function') {
+                await player.extractors.register(YoutubeiExtractor, {});
+            }
+            await player.extractors.register(SpotifyExtractor, {});
+            await player.extractors.register(AppleMusicExtractor, {});
             await player.extractors.register(SoundCloudExtractor, {});
-            
-            // 2. Force Spotify and Apple Music to completely bypass YouTube and pull audio streams directly from SoundCloud
-            await player.extractors.register(SpotifyExtractor, { bridgeProvider: SoundCloudExtractor });
-            await player.extractors.register(AppleMusicExtractor, { bridgeProvider: SoundCloudExtractor });
-            
-            // 3. Register YouTube last (only used if someone explicitly queues a direct YT link)
-            await player.extractors.register(YouTubeExtractor, {});
-            
-            console.log(`✅ SoundCloud Bridges Hard-Wired: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
-        } catch (e) { 
-            console.error("❌ Extractor Manual Load Error:", e); 
+            console.log(`✅ Extractors Active: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
+        } catch (e) {
+            console.error("Extractor Setup Warning:", e.message);
         }
         
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
-        
+        await ensureStandbyBanner(client);
+
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
         const cmds = [
             { name: 'summon', description: 'Summons the Miko Music Control Panel' },
             { name: 'queue', description: 'Displays the current music queue' },
-            { name: 'move', description: 'Move a track', options: [ { name: 'track', description: 'Current #', type: 4, required: true }, { name: 'position', description: 'New #', type: 4, required: true } ] }
+            { name: 'move', description: 'Move a track in queue', options: [ { name: 'track', description: 'Current position (#)', type: 4, required: true }, { name: 'position', description: 'New position (#)', type: 4, required: true } ] }
         ];
         await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: cmds });
         client.guilds.cache.forEach(g => rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, g.id), { body: cmds }).catch(()=>{}));
     });
+
+    async function deployControlPanel(guild, channel, targetTextChannel, interaction = null) {
+        const queue = player.nodes.create(guild, { 
+            metadata: { channel: targetTextChannel, panelMessage: null }, 
+            leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false 
+        });
+        
+        if (!queue.connection) await queue.connect(channel);
+
+        // Cleanup old panel to prevent chat spam
+        if (queue.metadata.panelMessage && queue.metadata.panelMessage.id) {
+            try { await queue.metadata.panelMessage.delete(); } catch(e) {}
+        }
+
+        const embed = new EmbedBuilder().setColor('#89b4fa').setTitle('🎛️ Miko Music Control Panel').setDescription('*Nothing is currently playing. Add a track to begin!*');
+        const row1 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('btn_queue').setLabel('Queue').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('btn_back').setLabel('Back').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('btn_pause').setLabel('Play/Pause').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('btn_skip').setLabel('Skip').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('btn_stop').setLabel('Stop').setStyle(ButtonStyle.Danger)
+        );
+        const row2 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('btn_loop').setLabel('Loop').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('btn_shuffle').setLabel('Shuffle').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('btn_add').setLabel('🔍 Add Song').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('btn_playlists').setLabel('📂 Load Playlist').setStyle(ButtonStyle.Secondary)
+        );
+
+        let msg;
+        if (interaction) {
+            msg = await interaction.followUp({ embeds: [embed], components: [row1, row2], fetchReply: true });
+        } else {
+            msg = await targetTextChannel.send({ embeds: [embed], components: [row1, row2] });
+        }
+
+        queue.metadata.panelMessage = msg;
+        updatePanel(queue);
+    }
 
     async function handlePlayback(channel, rawQuery, interaction) {
         try {
@@ -130,31 +196,7 @@ function startBot() {
                         return interaction.reply({ content: `❌ Please use the dedicated music panel channel.`, ephemeral: true });
                     }
                     await interaction.deferReply();
-                    
-                    const queue = player.nodes.create(interaction.guild, { 
-                        metadata: { channel: interaction.channel, panelMessage: null }, 
-                        leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false 
-                    });
-                    
-                    if (!queue.connection) await queue.connect(channel);
-                    
-                    const embed = new EmbedBuilder().setColor('#89b4fa').setTitle('🎛️ Miko Music Control Panel').setDescription('*Nothing is currently playing.*');
-                    const row1 = new ActionRowBuilder().addComponents(
-                        new ButtonBuilder().setCustomId('btn_queue').setLabel('Queue').setStyle(ButtonStyle.Secondary),
-                        new ButtonBuilder().setCustomId('btn_back').setLabel('Back').setStyle(ButtonStyle.Secondary),
-                        new ButtonBuilder().setCustomId('btn_pause').setLabel('Play/Pause').setStyle(ButtonStyle.Primary),
-                        new ButtonBuilder().setCustomId('btn_skip').setLabel('Skip').setStyle(ButtonStyle.Secondary),
-                        new ButtonBuilder().setCustomId('btn_stop').setLabel('Stop').setStyle(ButtonStyle.Danger)
-                    );
-                    const row2 = new ActionRowBuilder().addComponents(
-                        new ButtonBuilder().setCustomId('btn_loop').setLabel('Loop').setStyle(ButtonStyle.Secondary),
-                        new ButtonBuilder().setCustomId('btn_shuffle').setLabel('Shuffle').setStyle(ButtonStyle.Secondary),
-                        new ButtonBuilder().setCustomId('btn_add').setLabel('🔍 Add Song').setStyle(ButtonStyle.Primary),
-                        new ButtonBuilder().setCustomId('btn_playlists').setLabel('📂 Load Playlist').setStyle(ButtonStyle.Secondary)
-                    );
-                    const msg = await interaction.followUp({ embeds: [embed], components: [row1, row2], fetchReply: true });
-                    queue.metadata.panelMessage = msg;
-                    updatePanel(queue);
+                    await deployControlPanel(interaction.guild, channel, interaction.channel, interaction);
                 }
                 if (interaction.commandName === 'queue') {
                     const queue = player.nodes.get(interaction.guildId);
@@ -169,15 +211,27 @@ function startBot() {
                     const from = interaction.options.getInteger('track') - 1;
                     const to = interaction.options.getInteger('position') - 1;
                     const tracks = queue.tracks.toArray();
-                    if (from < 0 || from >= tracks.length || to < 0) return interaction.reply({ content: 'Invalid track numbers.', ephemeral: true });
-                    const track = tracks[from];
-                    queue.node.remove(track);
-                    queue.node.insert(track, to);
-                    await interaction.reply({ content: `✅ Moved **${track.title}**`, ephemeral: true });
+                    if (from < 0 || from >= tracks.length || to < 0 || to >= tracks.length) return interaction.reply({ content: 'Invalid track numbers.', ephemeral: true });
+                    
+                    try { queue.node.move(from, to); } catch(e) {
+                        const track = tracks[from];
+                        queue.node.remove(track);
+                        queue.node.insert(track, to);
+                    }
+                    
+                    await interaction.reply({ content: `✅ Track moved successfully!`, ephemeral: true });
                     updatePanel(queue);
                 }
             }
             if (interaction.isButton()) {
+                if (interaction.customId === 'btn_summon_standby') {
+                    const channel = interaction.member?.voice?.channel;
+                    if (!channel) return interaction.reply({ content: '❌ You must be inside a Voice Channel to summon the bot!', ephemeral: true });
+                    await interaction.deferReply({ ephemeral: true });
+                    await deployControlPanel(interaction.guild, channel, interaction.channel, null);
+                    return interaction.followUp({ content: `✅ Bot connected to **${channel.name}** and panel ready!`, ephemeral: true });
+                }
+
                 const queue = player.nodes.get(interaction.guildId);
                 if (interaction.customId === 'btn_queue') {
                     if (!queue) return interaction.reply({ content: 'Nothing playing.', ephemeral: true });
@@ -192,8 +246,8 @@ function startBot() {
                 }
                 if (interaction.customId === 'btn_playlists') {
                     const config = getConfig();
-                    if (!config.savedPlaylists || !config.savedPlaylists.length) return interaction.reply({ content: 'No playlists.', ephemeral: true });
-                    const menu = new StringSelectMenuBuilder().setCustomId('menu_playlist').setPlaceholder('Select playlist');
+                    if (!config.savedPlaylists || !config.savedPlaylists.length) return interaction.reply({ content: 'No playlists saved in dashboard.', ephemeral: true });
+                    const menu = new StringSelectMenuBuilder().setCustomId('menu_playlist').setPlaceholder('Select playlist to play');
                     config.savedPlaylists.slice(0, 25).forEach((pl, index) => { 
                         const codeStr = pl.shortcode ? ` [${pl.shortcode}]` : '';
                         menu.addOptions({ label: ((pl.name || 'Unnamed') + codeStr).substring(0, 95), value: index.toString() }); 

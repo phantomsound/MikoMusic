@@ -46,6 +46,7 @@ function startServer(discordClient) {
     });
 
     app.get('/api/queue', (req, res) => {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         try {
             const queue = discordClient.player?.nodes?.cache?.first();
             if (!queue) return res.json({ current: null, tracks: [], volume: 100 });
@@ -99,7 +100,6 @@ function startServer(discordClient) {
         } catch (e) { res.json({ success: false, message: e.message }); }
     });
 
-    // Remote Dashboard Play/Queue Integration
     app.post('/api/play', async (req, res) => {
         try {
             const { query } = req.body;
@@ -108,7 +108,7 @@ function startServer(discordClient) {
 
             const queue = discordClient.player.nodes.get(guild.id);
             const vChannel = queue?.channel;
-            if (!vChannel) return res.json({ success: false, message: "Bot is not in a voice channel. Use the Remote Voice Connection to join a channel first!" });
+            if (!vChannel) return res.json({ success: false, message: "Bot is not in a voice channel. Connect via the Voice card first!" });
 
             const config = JSON.parse(fs.readFileSync('./config.json', 'utf-8') || '{}');
             const playlists = config.savedPlaylists || [];
@@ -145,10 +145,14 @@ function startServer(discordClient) {
             if (action === 'loopOff') queue.setRepeatMode(QueueRepeatMode.OFF);
             if (action === 'move') {
                 const tracks = queue.tracks.toArray();
-                if (from < 1 || from > tracks.length || to < 1) return res.json({ success: false, message: "Invalid index" });
-                const track = tracks[from - 1];
-                queue.node.remove(track);
-                queue.node.insert(track, to - 1);
+                if (from < 1 || from > tracks.length || to < 1 || to > tracks.length) return res.json({ success: false, message: "Invalid track positions" });
+                try {
+                    queue.node.move(from - 1, to - 1);
+                } catch(e) {
+                    const track = tracks[from - 1];
+                    queue.node.remove(track);
+                    queue.node.insert(track, to - 1);
+                }
             }
             res.json({ success: true });
         } catch (e) { res.json({ success: false, message: e.message }); }
