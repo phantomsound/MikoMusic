@@ -1,9 +1,5 @@
-﻿// MUST BE LINE 1: Forces the native engine to route audio streams through the 403-bypass module
-process.env.DP_FORCE_YTDL_MOD = '@distube/ytdl-core';
-
-const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
+﻿const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
 const { Player, QueueRepeatMode } = require('discord-player');
-const { DefaultExtractors } = require('@discord-player/extractor');
 const fs = require('fs');
 
 function getConfig() {
@@ -73,14 +69,7 @@ async function ensureStandbyBanner(client) {
 
 function startBot() {
     const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
-    
-    // Initialize Player with resilient YTDL settings to prevent skips
-    const player = new Player(client, {
-        ytdlOptions: {
-            quality: 'highestaudio',
-            highWaterMark: 1 << 25
-        }
-    });
+    const player = new Player(client);
     client.player = player;
     
     player.events.on('error', (q, e) => console.log('Player Error:', e.message));
@@ -95,9 +84,19 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            // Pristine, unrestricted native extractor load
-            await player.extractors.loadMulti(DefaultExtractors);
-            console.log(`✅ Pristine Extractors Loaded. Audio Engine: @distube/ytdl-core`);
+            const { SpotifyExtractor, AppleMusicExtractor, YouTubeExtractor, SoundCloudExtractor } = require('@discord-player/extractor');
+            
+            // 1. Hardwire YouTube using the robust youtube-ext engine to completely dodge 403 blocks
+            await player.extractors.register(YouTubeExtractor, { useClient: 'youtube-ext' });
+            
+            // 2. Hardwire Spotify to strictly use the YouTube bridge so it grabs the official studio tracks
+            await player.extractors.register(SpotifyExtractor, { bridgeProvider: YouTubeExtractor });
+            await player.extractors.register(AppleMusicExtractor, { bridgeProvider: YouTubeExtractor });
+            
+            // 3. Register SoundCloud natively
+            await player.extractors.register(SoundCloudExtractor, {});
+            
+            console.log(`✅ Pristine Extractors Active: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
         } catch (e) {
             console.error("Extractor Setup Warning:", e.message);
         }
