@@ -77,7 +77,7 @@ function startBot() {
         client.guilds.cache.forEach(g => rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, g.id), { body: cmds }).catch(()=>{}));
     });
 
-        async function handlePlayback(channel, rawQuery, interaction) {
+    async function handlePlayback(channel, rawQuery, interaction) {
         try {
             const playlists = getConfig().savedPlaylists || [];
             const cleanQuery = rawQuery.toLowerCase().trim();
@@ -123,7 +123,6 @@ function startBot() {
             console.error("Playback Error:", err);
             await interaction.followUp(`❌ Failed to play track. Error: ${err.message}`);
         }
-    }
     }
 
     client.on('interactionCreate', async interaction => {
@@ -235,4 +234,3 @@ function startBot() {
     return client;
 }
 module.exports = { startBot };
-
