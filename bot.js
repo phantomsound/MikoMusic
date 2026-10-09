@@ -1,4 +1,7 @@
-﻿const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
+﻿// MUST BE LINE 1: Forces the native YouTube Extractor to use the official bypass engine to avoid 403 skips
+process.env.DP_FORCE_YTDL_MOD = 'youtube-ext';
+
+const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
 const { Player, QueueRepeatMode } = require('discord-player');
 const fs = require('fs');
 
@@ -72,9 +75,17 @@ function startBot() {
     const player = new Player(client);
     client.player = player;
     
-    player.events.on('error', (q, e) => console.log('Player Error:', e.message));
-    player.events.on('playerError', (q, e) => console.log('Stream Blocked:', e.message));
-    player.events.on('playerSkip', (q, track) => console.log(`Skipped Track: ${track.title}`));
+    // Explicit debug listeners so we never get a silent error again
+    player.events.on('error', (q, e) => console.log('❌ Player Error:', e.message));
+    player.events.on('playerError', (q, e) => console.log('❌ Stream Blocked (403):', e.message));
+    player.events.on('playerSkip', (q, track) => console.log(`⚠️ Skipped Track: ${track.title}`));
+    
+    // Core Extractor & Bridge Debugging
+    player.events.on('debug', (q, m) => {
+        if (m.includes('Extractor') || m.includes('Bridge') || m.includes('youtube')) {
+            console.log('🔍 [DEBUG]', m);
+        }
+    });
     
     player.events.on('playerStart', (queue, track) => { logNowPlaying(queue.guild, track); updatePanel(queue); });
     player.events.on('audioTrackAdd', (queue) => updatePanel(queue));
@@ -86,25 +97,12 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            console.log("Loading Extractor Engines...");
-            const { SpotifyExtractor, AppleMusicExtractor, SoundCloudExtractor } = require('@discord-player/extractor');
-            const { YoutubeiExtractor } = require('discord-player-youtubei');
-
-            // 1. Explicitly register Android TV bypass FIRST
-            await player.extractors.register(YoutubeiExtractor, {});
-            console.log("✅ YoutubeiExtractor (Android TV Bypass) Registered");
-
-            // 2. Explicitly register Spotify and map it directly to the TV Bypass to dodge VEVO DRM
-            await player.extractors.register(SpotifyExtractor, { bridgeProvider: YoutubeiExtractor });
-            console.log("✅ SpotifyExtractor Registered & Bridged to TV Spoofing");
-
-            // 3. Register standalone fallbacks
-            await player.extractors.register(AppleMusicExtractor, { bridgeProvider: YoutubeiExtractor });
-            await player.extractors.register(SoundCloudExtractor, {});
-            
+            // Natively loads ALL official extractors perfectly without hacky try/catch blocks
+            await player.extractors.loadDefault();
             console.log(`✅ All Extractors Online: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
+            console.log(`✅ Forced Audio Bridge Engine: ${process.env.DP_FORCE_YTDL_MOD}`);
         } catch (e) {
-            console.error("❌ FATAL EXTRACTOR BOOT ERROR:", e.stack);
+            console.error("❌ FATAL EXTRACTOR BOOT ERROR:", e);
         }
         
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
