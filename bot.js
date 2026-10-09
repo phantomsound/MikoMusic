@@ -1,5 +1,8 @@
 ﻿const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
 const { Player, QueueRepeatMode } = require('discord-player');
+
+// 1. Explicitly import the extractors so dynamic loading is bypassed
+const { SpotifyExtractor, AppleMusicExtractor, YouTubeExtractor, SoundCloudExtractor } = require('@discord-player/extractor');
 const fs = require('fs');
 
 function getConfig() {
@@ -60,11 +63,15 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            // Unrestricted Native Extractor Load
-            await player.extractors.loadDefault();
-            console.log(`✅ Extractors Loaded Successfully! (${player.extractors.store.size} modules active)`);
+            // 2. Manually register every single extractor
+            await player.extractors.register(SpotifyExtractor, {});
+            await player.extractors.register(AppleMusicExtractor, {});
+            await player.extractors.register(YouTubeExtractor, {});
+            await player.extractors.register(SoundCloudExtractor, {});
+            
+            console.log(`✅ Static Extractors Successfully Hard-Wired: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
         } catch (e) { 
-            console.error("❌ Extractor Load Error:", e); 
+            console.error("❌ Extractor Manual Load Error:", e); 
         }
         
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
@@ -127,7 +134,7 @@ function startBot() {
                         leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false 
                     });
                     
-                    if (!queue.channel) await queue.connect(channel);
+                    if (!queue.connection) await queue.connect(channel);
                     
                     const embed = new EmbedBuilder().setColor('#89b4fa').setTitle('🎛️ Miko Music Control Panel').setDescription('*Nothing is currently playing.*');
                     const row1 = new ActionRowBuilder().addComponents(
