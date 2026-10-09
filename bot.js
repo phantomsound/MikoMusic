@@ -1,10 +1,8 @@
 ﻿const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
-const { Player, QueueRepeatMode, Track, Playlist, QueryType } = require('discord-player');
+const { Player, QueueRepeatMode } = require('discord-player');
+const { DefaultExtractors } = require('@discord-player/extractor');
+const { YoutubeiExtractor } = require('discord-player-youtubei');
 const fs = require('fs');
-
-const fetch = require('isomorphic-unfetch');
-const spotify = require('spotify-url-info')(fetch);
-const ytext = require('youtube-ext');
 
 function getConfig() {
     try { return JSON.parse(fs.readFileSync('./config.json', 'utf-8')); } catch (e) { return {}; }
@@ -19,7 +17,7 @@ async function logNowPlaying(guild, track) {
                 const embed = new EmbedBuilder()
                     .setColor('#2b2d31').setAuthor({ name: '💿 Now Playing' })
                     .setTitle(track.title).setURL(track.url)
-                    .setDescription(`${track.duration} - [${track.requestedBy ? track.requestedBy.toString() : 'Auto'}]\nSong By: ${track.author}`)
+                    .setDescription(`${track.duration} - [${track.requestedBy ? track.requestedBy.toString() : 'Remote Dashboard'}]\nSong By: ${track.author}`)
                     .setThumbnail(track.thumbnail).setFooter({ text: `Volume 100% • MikoMusic` });
                 await channel.send({ embeds: [embed] });
             }
@@ -38,7 +36,7 @@ async function updatePanel(queue) {
             const nextText = upNext.length > 0 ? upNext.map((t, i) => `**${i+1}.** ${t.title}`).join('\n') : 'Queue is empty.';
             embed.addFields({ name: '⏭️ Up Next', value: nextText });
             const mode = queue.repeatMode === QueueRepeatMode.TRACK ? 'Track' : queue.repeatMode === QueueRepeatMode.QUEUE ? 'Queue' : 'Off';
-            embed.setFooter({ text: `Queue: ${queue.tracks.size} tracks | Loop: ${mode}` });
+            embed.setFooter({ text: `Queue: ${queue.tracks.size} tracks | Loop: ${mode} | Vol: ${queue.node.volume}%` });
         } else {
             embed.setDescription('*Nothing is currently playing. Add a song to get started!*');
             embed.setFooter({ text: 'Queue is empty' });
@@ -52,17 +50,25 @@ function startBot() {
     const player = new Player(client);
     client.player = player;
     
-    player.events.on('error', () => {});
-    player.events.on('playerError', () => {});
+    player.events.on('error', (q, e) => console.log('Player Error:', e.message));
+    player.events.on('playerError', (q, e) => console.log('Audio Error:', e.message));
     player.events.on('playerStart', (queue, track) => { logNowPlaying(queue.guild, track); updatePanel(queue); });
     player.events.on('audioTrackAdd', (queue) => updatePanel(queue));
     player.events.on('audioTracksAdd', (queue) => updatePanel(queue));
     player.events.on('audioTrackRemove', (queue) => updatePanel(queue));
     player.events.on('emptyQueue', (queue) => updatePanel(queue));
     player.events.on('disconnect', (queue) => updatePanel(queue));
+    player.events.on('volumeChange', (queue) => updatePanel(queue));
 
     client.once('clientReady', async () => {
-        try { await player.extractors.loadDefault(); } catch (e) { }
+        try {
+            // v7 Extractor Architecture: Load defaults, explicitly bypass broken YouTube, and register YouTubei API
+            const safeExtractors = DefaultExtractors.filter(ext => ext.name !== 'YouTubeExtractor');
+            await player.extractors.loadMulti(safeExtractors);
+            await player.extractors.register(YoutubeiExtractor, {});
+            console.log("✅ Discord Player v7 Architecture & YouTubei Bypass Loaded.");
+        } catch (e) { console.error("Extractor Load Error:", e); }
+        
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
         
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
@@ -82,115 +88,26 @@ function startBot() {
             const matchedMacro = playlists.find(pl => pl.shortcode && pl.shortcode.toLowerCase() === cleanQuery);
             let safeQuery = matchedMacro ? matchedMacro.url : rawQuery;
             
-            let playTarget = null;
-            let queryTitle = '';
+            if (safeQuery.includes('music.youtube.com')) safeQuery = safeQuery.replace('music.youtube.com', 'www.youtube.com');
+            try { const u = new URL(safeQuery); u.searchParams.delete('si'); safeQuery = u.toString(); } catch(e) {}
+            
+            const existingQueue = player.nodes.get(interaction.guild.id);
+            const panelMsg = existingQueue ? existingQueue.metadata.panelMessage : null;
 
-            // 1. STEALTH INTERCEPTOR: Spotify
-            if (safeQuery.includes('spotify.com')) {
-                console.log("[Stealth] Routing Spotify via embed interceptor...");
-                try {
-                    const data = await spotify.getData(safeQuery);
-                    if (data.type === 'playlist' || data.type === 'album') {
-                        const tracksData = await spotify.getTracks(safeQuery);
-                        const customPlaylist = new Playlist(player, {
-                            title: data.name,
-                            thumbnail: data.coverArt?.sources?.[0]?.url || '',
-                            type: 'playlist',
-                            source: 'spotify',
-                            author: { name: data.owner?.name || data.artists?.[0]?.name || 'Spotify' },
-                            tracks: [],
-                            url: safeQuery
-                        });
-                        const customTracks = tracksData.map(t => new Track(player, {
-                            title: t.name,
-                            author: t.artists?.[0]?.name || 'Unknown',
-                            url: t.external_urls?.spotify || safeQuery,
-                            requestedBy: interaction.user,
-                            source: 'spotify',
-                            queryType: QueryType.SPOTIFY_TRACK
-                        }));
-                        customPlaylist.tracks = customTracks;
-                        customTracks.forEach(t => t.playlist = customPlaylist);
-                        playTarget = customPlaylist;
-                        queryTitle = customPlaylist.title;
-                    } else {
-                        playTarget = new Track(player, {
-                            title: data.name,
-                            author: data.artists?.[0]?.name || 'Unknown',
-                            url: safeQuery,
-                            requestedBy: interaction.user,
-                            source: 'spotify',
-                            queryType: QueryType.SPOTIFY_TRACK
-                        });
-                        queryTitle = playTarget.title;
-                    }
-                } catch(e) { console.error("Spotify Intercept Error:", e.message); }
-            } 
+            const { track, queue } = await player.play(channel, safeQuery, {
+                nodeOptions: {
+                    metadata: { channel: interaction.channel, panelMessage: panelMsg },
+                    leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false
+                },
+                requestedBy: interaction.user
+            });
             
-            // 2. STEALTH INTERCEPTOR: YouTube
-            else if (safeQuery.includes('youtube.com') || safeQuery.includes('youtu.be')) {
-                console.log("[Stealth] Routing YouTube via iOS App Simulator...");
-                safeQuery = safeQuery.replace('music.youtube.com', 'www.youtube.com');
-                try { const u = new URL(safeQuery); u.searchParams.delete('si'); safeQuery = u.toString(); } catch(e) {}
-                
-                try {
-                    if (safeQuery.includes('list=')) {
-                        const listData = await ytext.playlistInfo(safeQuery);
-                        const customPlaylist = new Playlist(player, {
-                            title: listData.title,
-                            type: 'playlist',
-                            source: 'youtube',
-                            author: { name: listData.channel?.name || 'YouTube' },
-                            tracks: [],
-                            url: safeQuery
-                        });
-                        const customTracks = listData.videos.map(v => new Track(player, {
-                            title: v.title,
-                            author: v.channel?.name || 'Unknown',
-                            url: v.url,
-                            requestedBy: interaction.user,
-                            source: 'youtube',
-                            queryType: QueryType.YOUTUBE_VIDEO
-                        }));
-                        customPlaylist.tracks = customTracks;
-                        customTracks.forEach(t => t.playlist = customPlaylist);
-                        playTarget = customPlaylist;
-                        queryTitle = customPlaylist.title;
-                    } else {
-                        const videoData = await ytext.videoInfo(safeQuery);
-                        playTarget = new Track(player, {
-                            title: videoData.title,
-                            author: videoData.channel?.name || 'Unknown',
-                            url: videoData.url,
-                            requestedBy: interaction.user,
-                            source: 'youtube',
-                            queryType: QueryType.YOUTUBE_VIDEO
-                        });
-                        queryTitle = playTarget.title;
-                    }
-                } catch(e) { console.error("YouTube Intercept Error:", e.message); }
-            }
-
-            // 3. FALLBACK: Direct Search
-            if (!playTarget) {
-                console.log("[Fallback] Searching raw query...");
-                const result = await player.search(safeQuery, { requestedBy: interaction.user });
-                if (!result || !result.hasTracks()) {
-                    return interaction.followUp(`❌ No tracks found for: ${safeQuery}`);
-                }
-                playTarget = result;
-                queryTitle = result.playlist ? result.playlist.title : result.tracks[0].title;
-            }
-            
-            // 4. INJECT TO QUEUE
-            const queue = player.nodes.create(interaction.guild, { metadata: { channel: interaction.channel, panelMessage: null }, leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false });
-            if (!queue.connection) await queue.connect(channel);
-            await player.play(channel, playTarget, { nodeOptions: { metadata: queue.metadata } });
-            
+            updatePanel(queue);
+            const title = track.playlist ? track.playlist.title : track.title;
             const aliasTag = matchedMacro ? ` *(shortcode: ${matchedMacro.shortcode})*` : '';
-            await interaction.followUp({ content: `✅ Queued: **${queryTitle}**${aliasTag}`, ephemeral: true });
+            await interaction.followUp({ content: `✅ Queued: **${title}**${aliasTag}`, ephemeral: true });
         } catch (err) {
-            console.error("Playback Error:", err);
+            console.error("Playback Error:", err.message);
             await interaction.followUp(`❌ Failed to play track. Error: ${err.message}`);
         }
     }
@@ -206,8 +123,14 @@ function startBot() {
                         return interaction.reply({ content: `❌ Please use the dedicated music panel channel.`, ephemeral: true });
                     }
                     await interaction.deferReply();
-                    const queue = player.nodes.create(interaction.guild, { leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false });
+                    
+                    const queue = player.nodes.create(interaction.guild, { 
+                        metadata: { channel: interaction.channel, panelMessage: null }, 
+                        leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false 
+                    });
+                    
                     if (!queue.connection) await queue.connect(channel);
+                    
                     const embed = new EmbedBuilder().setColor('#89b4fa').setTitle('🎛️ Miko Music Control Panel').setDescription('*Nothing is currently playing.*');
                     const row1 = new ActionRowBuilder().addComponents(
                         new ButtonBuilder().setCustomId('btn_queue').setLabel('Queue').setStyle(ButtonStyle.Secondary),
@@ -223,7 +146,7 @@ function startBot() {
                         new ButtonBuilder().setCustomId('btn_playlists').setLabel('📂 Load Playlist').setStyle(ButtonStyle.Secondary)
                     );
                     const msg = await interaction.followUp({ embeds: [embed], components: [row1, row2], fetchReply: true });
-                    queue.metadata = { panelMessage: msg, channel: interaction.channel };
+                    queue.metadata.panelMessage = msg;
                     updatePanel(queue);
                 }
                 if (interaction.commandName === 'queue') {
@@ -272,7 +195,7 @@ function startBot() {
                 }
                 if (!queue) return interaction.reply({ content: 'Nothing playing.', ephemeral: true });
 
-                if (interaction.customId === 'btn_pause') { queue.node.setPaused(!queue.node.isPaused()); await interaction.reply({ content: '⏯️ Toggled.', ephemeral: true }); }
+                if (interaction.customId === 'btn_pause') { queue.node.setPaused(!queue.node.isPaused()); await interaction.reply({ content: '⏯️ Toggled.', ephemeral: true }); updatePanel(queue); }
                 if (interaction.customId === 'btn_skip') { queue.node.skip(); await interaction.reply({ content: '⏭️ Skipped.', ephemeral: true }); }
                 if (interaction.customId === 'btn_stop') { queue.delete(); await interaction.reply({ content: '⏹️ Stopped.', ephemeral: true }); }
                 if (interaction.customId === 'btn_back' && queue.history.previousTrack) { await queue.history.previous(); await interaction.reply({ content: '⏮️ Back.', ephemeral: true }); }

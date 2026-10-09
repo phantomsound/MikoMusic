@@ -12,7 +12,7 @@
         input, select { padding: 0.6rem; background: var(--input); border: 1px solid var(--border); color: var(--text); border-radius: 4px; box-sizing: border-box; width: 100%; }
         button { background: var(--blue); color: #11111b; padding: 0.6rem 1.2rem; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 0.5rem; transition: opacity 0.2s; }
         button:hover { opacity: 0.8; }
-        .btn-success { background: var(--green); } .btn-danger { background: var(--red); } .btn-warning { background: var(--yellow); }
+        .btn-success { background: var(--green); } .btn-danger { background: var(--red); } .btn-warning { background: var(--yellow); } .btn-secondary { background: var(--border); color: white; }
         .help-text { font-size: 0.85rem; color: #a6adc8; margin-bottom: 1rem; display: block; }
         .controls-row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
         .overrides-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 1rem; }
@@ -26,8 +26,14 @@
     </style>
 </head>
 <body>
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h1>🎛️ Miko Music Dashboard</h1>
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+        <div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <h1 id="dashTitle" style="margin: 0;">Miko Music Dashboard</h1>
+                <button onclick="editDashName()" style="margin:0; padding: 4px 8px; font-size: 0.8rem;" class="btn-secondary">✏️ Rename</button>
+            </div>
+            <span id="serverBadge" style="color: var(--green); font-size: 0.9rem; font-weight: bold; margin-top: 5px; display: inline-block;">📡 Active Server: Loading...</span>
+        </div>
         <button class="btn-success" onclick="openDiscordInvite()">➕ Invite Bot to Server</button>
     </div>
     
@@ -44,7 +50,13 @@
     </div>
     
     <div class="card full" style="border-left: 4px solid var(--yellow);">
-        <h3>Live Audio Overrides & Maintenance</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <h3 style="margin: 0;">Live Audio Overrides & Maintenance</h3>
+            <div style="display: flex; align-items: center; gap: 10px; background: var(--input); padding: 0.5rem 1rem; border-radius: 20px;">
+                <span>🔊 Volume: <span id="volLabel">100</span>%</span>
+                <input type="range" id="volSlider" min="0" max="200" value="100" onchange="setVolume()" style="width: 150px; margin: 0;">
+            </div>
+        </div>
         <div class="overrides-grid">
             <button onclick="controlPlayer('back')">⏮️ Back</button>
             <button onclick="controlPlayer('pause')">⏯️ Play / Pause</button>
@@ -69,8 +81,14 @@
         </div>
 
         <div class="card">
-            <h3>Live Queue Management</h3>
-            <span class="help-text">View and manage the active queue.</span>
+            <h3>Live Queue & Remote Play</h3>
+            <span class="help-text">View the active queue or remotely queue a song from here.</span>
+            
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                <input type="text" id="remotePlayInput" placeholder="Enter URL or shortcode..." style="flex: 1; margin: 0;">
+                <button class="btn-success" onclick="remotePlay()" style="margin: 0;">▶️ Queue</button>
+            </div>
+
             <div id="activeNowPlaying" style="color: var(--green); font-weight: bold; margin-bottom: 0.5rem;">Nothing Playing</div>
             <div id="queueContainer" style="max-height: 180px; overflow-y: auto; background: var(--input); padding: 0.5rem; border-radius: 4px;"></div>
             
@@ -86,7 +104,7 @@
     
     <div class="card full">
         <h3>Playlist Manager & Macros (Notepad)</h3>
-        <p class="help-text">Set an optional shortcode (e.g., <code>fng</code>) to instantly queue the associated URL in Discord. <b>Tip: Use Spotify URLs to avoid YouTube IP Blocks!</b></p>
+        <p class="help-text">Set an optional shortcode (e.g., <code>fng</code>) to instantly queue the associated URL.</p>
         <div id="plContainer"></div>
         <div style="margin-top: 1rem;">
             <button onclick="addEmptyPlaylistRow()" class="btn-success">+ Add Row</button>
@@ -96,8 +114,13 @@
     
     <script>
         let cachedPlaylists = [];
+        let isFirstLoad = true;
 
         function loadConfig() {
+            fetch('/api/server-info').then(r => r.json()).then(data => {
+                document.getElementById('serverBadge').innerText = `📡 Active Server: ${data.serverName}`;
+            });
+
             fetch('/api/channels').then(r => r.json()).then(channels => {
                 const panel = document.getElementById('panelChannelId');
                 const log = document.getElementById('logChannelId');
@@ -109,6 +132,7 @@
                 });
                 
                 fetch('/api/config').then(r => r.json()).then(data => {
+                    if (data.dashboardName) document.getElementById('dashTitle').innerText = data.dashboardName;
                     if (data.panelChannelId) panel.value = data.panelChannelId;
                     if (data.logChannelId) log.value = data.logChannelId;
                     cachedPlaylists = data.savedPlaylists || [];
@@ -131,19 +155,44 @@
                 document.getElementById('activeNowPlaying').innerText = data.current ? `▶️ ${data.current}` : 'Nothing Playing';
                 const qc = document.getElementById('queueContainer');
                 qc.innerHTML = data.tracks.length ? data.tracks.map(t => `<div class="queue-item"><b>${t.index}.</b> ${t.title}</div>`).join('') : '<span class="help-text">Queue is empty.</span>';
+                
+                if (isFirstLoad && data.volume !== undefined) {
+                    document.getElementById('volSlider').value = data.volume;
+                    document.getElementById('volLabel').innerText = data.volume;
+                    isFirstLoad = false;
+                }
             });
         }
 
-        setInterval(refreshQueue, 5000);
+        setInterval(refreshQueue, 3000);
+
+        function editDashName() {
+            const newName = prompt("Enter new dashboard name:", document.getElementById('dashTitle').innerText);
+            if (newName && newName.trim() !== '') {
+                fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dashboardName: newName.trim() }) })
+                .then(() => document.getElementById('dashTitle').innerText = newName.trim());
+            }
+        }
 
         function manageVoice(action) {
             const channelId = document.getElementById('voiceChannelSelect').value;
-            fetch('/api/voice', { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ action, channelId }) 
-            }).then(r => r.json()).then(res => { 
-                if(!res.success) alert(res.message); 
+            fetch('/api/voice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, channelId }) })
+            .then(r => r.json()).then(res => { if(!res.success) alert(res.message); });
+        }
+
+        function setVolume() {
+            const vol = document.getElementById('volSlider').value;
+            document.getElementById('volLabel').innerText = vol;
+            fetch('/api/volume', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ volume: vol }) });
+        }
+
+        function remotePlay() {
+            const query = document.getElementById('remotePlayInput').value;
+            if (!query) return;
+            fetch('/api/play', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) })
+            .then(r => r.json()).then(res => {
+                if (!res.success) alert(res.message);
+                else { document.getElementById('remotePlayInput').value = ''; refreshQueue(); }
             });
         }
 

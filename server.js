@@ -1,6 +1,5 @@
 ﻿const express = require('express');
 const fs = require('fs');
-const { exec } = require('child_process');
 const { QueueRepeatMode } = require('discord-player');
 const app = express();
 
@@ -10,12 +9,24 @@ process.on('uncaughtException', error => console.error('Uncaught Exception:', er
 app.use(express.json());
 app.use(express.static('public'));
 
+function updateConfig(newValues) {
+    let config = {};
+    try { config = JSON.parse(fs.readFileSync('./config.json', 'utf-8')); } catch (e) {}
+    config = { ...config, ...newValues };
+    fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
+}
+
 function startServer(discordClient) {
     app.get('/api/config', (req, res) => {
         try {
             const config = JSON.parse(fs.readFileSync('./config.json', 'utf-8'));
             res.json({ ...config, clientId: process.env.CLIENT_ID });
         } catch (e) { res.json({ clientId: process.env.CLIENT_ID, savedPlaylists: [] }); }
+    });
+
+    app.get('/api/server-info', (req, res) => {
+        const guild = discordClient.guilds.cache.first();
+        res.json({ serverName: guild ? guild.name : "Not Connected" });
     });
 
     app.get('/api/channels', (req, res) => {
@@ -26,7 +37,6 @@ function startServer(discordClient) {
         } catch (e) { res.json([]); }
     });
 
-    // NEW: Fetch Voice Channels for Mobile UI
     app.get('/api/voice-channels', (req, res) => {
         try {
             const guild = discordClient.guilds.cache.first();
@@ -38,30 +48,25 @@ function startServer(discordClient) {
     app.get('/api/queue', (req, res) => {
         try {
             const queue = discordClient.player?.nodes?.cache?.first();
-            if (!queue) return res.json({ current: null, tracks: [] });
+            if (!queue) return res.json({ current: null, tracks: [], volume: 100 });
             res.json({
                 current: queue.currentTrack ? queue.currentTrack.title : null,
-                tracks: queue.tracks.map((t, i) => ({ index: i + 1, title: t.title }))
+                tracks: queue.tracks.map((t, i) => ({ index: i + 1, title: t.title })),
+                volume: queue.node.volume
             });
-        } catch (e) { res.json({ current: null, tracks: [] }); }
+        } catch (e) { res.json({ current: null, tracks: [], volume: 100 }); }
     });
 
-    app.post('/api/update-channels', (req, res) => {
-        const config = JSON.parse(fs.readFileSync('./config.json', 'utf-8'));
-        config.panelChannelId = req.body.panelChannelId;
-        config.logChannelId = req.body.logChannelId;
-        fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
+    app.post('/api/settings', (req, res) => {
+        updateConfig(req.body);
         res.json({ success: true });
     });
 
     app.post('/api/playlists', (req, res) => {
-        const config = JSON.parse(fs.readFileSync('./config.json', 'utf-8'));
-        config.savedPlaylists = req.body.playlists;
-        fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
+        updateConfig({ savedPlaylists: req.body.playlists });
         res.json({ success: true });
     });
 
-    // NEW: Handle Remote Voice Join & Disconnect
     app.post('/api/voice', async (req, res) => {
         try {
             const { action, channelId } = req.body;
@@ -83,6 +88,45 @@ function startServer(discordClient) {
                 return res.json({ success: true });
             }
         } catch (e) { res.json({ success: false, message: e.message }); }
+    });
+
+    app.post('/api/volume', (req, res) => {
+        try {
+            const queue = discordClient.player?.nodes?.cache?.first();
+            if (!queue) return res.json({ success: false, message: "Nothing playing." });
+            queue.node.setVolume(Number(req.body.volume));
+            res.json({ success: true });
+        } catch (e) { res.json({ success: false, message: e.message }); }
+    });
+
+    // Remote Dashboard Play/Queue Integration
+    app.post('/api/play', async (req, res) => {
+        try {
+            const { query } = req.body;
+            const guild = discordClient.guilds.cache.first();
+            if (!guild) return res.json({ success: false, message: "No server connected." });
+
+            const queue = discordClient.player.nodes.get(guild.id);
+            const vChannel = queue?.channel;
+            if (!vChannel) return res.json({ success: false, message: "Bot is not in a voice channel. Use the Remote Voice Connection to join a channel first!" });
+
+            const config = JSON.parse(fs.readFileSync('./config.json', 'utf-8') || '{}');
+            const playlists = config.savedPlaylists || [];
+            const cleanQuery = query.toLowerCase().trim();
+            const matchedMacro = playlists.find(pl => pl.shortcode && pl.shortcode.toLowerCase() === cleanQuery);
+            let safeQuery = matchedMacro ? matchedMacro.url : query;
+            if (safeQuery.includes('music.youtube.com')) safeQuery = safeQuery.replace('music.youtube.com', 'www.youtube.com');
+
+            const { track } = await discordClient.player.play(vChannel, safeQuery, {
+                nodeOptions: {
+                    metadata: { channel: vChannel, panelMessage: queue.metadata?.panelMessage },
+                    leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false
+                }
+            });
+            res.json({ success: true, title: track.playlist ? track.playlist.title : track.title });
+        } catch(e) {
+            res.json({ success: false, message: e.message });
+        }
     });
 
     app.post('/api/control', async (req, res) => {
@@ -108,13 +152,6 @@ function startServer(discordClient) {
             }
             res.json({ success: true });
         } catch (e) { res.json({ success: false, message: e.message }); }
-    });
-
-    app.post('/api/update-extractors', (req, res) => {
-        exec('npm install discord-player-youtubei youtube-ext play-dl @distube/ytdl-core@latest', () => {
-            res.json({ success: true });
-            setTimeout(() => process.exit(0), 2000); 
-        });
     });
 
     const port = process.env.PORT || 3000;
