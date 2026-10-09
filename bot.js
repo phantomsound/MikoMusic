@@ -3,8 +3,7 @@ const { Player, QueueRepeatMode } = require('discord-player');
 const fs = require('fs');
 
 function getConfig() {
-    try { return JSON.parse(fs.readFileSync('./config.json', 'utf-8')); } 
-    catch (e) { return {}; }
+    try { return JSON.parse(fs.readFileSync('./config.json', 'utf-8')); } catch (e) { return {}; }
 }
 
 async function logNowPlaying(guild, track) {
@@ -14,47 +13,34 @@ async function logNowPlaying(guild, track) {
             const channel = guild.channels.cache.get(config.logChannelId);
             if (channel) {
                 const embed = new EmbedBuilder()
-                    .setColor('#2b2d31')
-                    .setAuthor({ name: '💿 Now Playing' })
-                    .setTitle(track.title)
-                    .setURL(track.url)
+                    .setColor('#2b2d31').setAuthor({ name: '💿 Now Playing' })
+                    .setTitle(track.title).setURL(track.url)
                     .setDescription(`${track.duration} - [${track.requestedBy ? track.requestedBy.toString() : 'Auto'}]\nSong By: ${track.author}`)
-                    .setThumbnail(track.thumbnail)
-                    .setFooter({ text: `Volume 100% • MikoMusic` });
+                    .setThumbnail(track.thumbnail).setFooter({ text: `Volume 100% • MikoMusic` });
                 await channel.send({ embeds: [embed] });
             }
         } catch(e) {}
     }
 }
 
-// Dynamically updates the persistent /summon panel Embed
 async function updatePanel(queue) {
     if (!queue || !queue.metadata || !queue.metadata.panelMessage) return;
     try {
         const current = queue.currentTrack;
         const upNext = queue.tracks.toArray().slice(0, 2);
-        
         const embed = new EmbedBuilder().setColor('#89b4fa').setTitle('🎛️ Miko Music Control Panel');
-        
         if (current) {
             embed.addFields({ name: '▶️ Now Playing', value: `[**${current.title}**](${current.url}) - \`${current.duration}\`` });
-            
-            if (upNext.length > 0) {
-                const nextText = upNext.map((t, i) => `**${i+1}.**${t.title}`).join('\n');
-                embed.addFields({ name: '⏭️ Up Next', value: nextText });
-            } else {
-                embed.addFields({ name: '⏭️ Up Next', value: 'Queue is empty.' });
-            }
-            
+            const nextText = upNext.length > 0 ? upNext.map((t, i) => `**${i+1}.** ${t.title}`).join('\n') : 'Queue is empty.';
+            embed.addFields({ name: '⏭️ Up Next', value: nextText });
             const mode = queue.repeatMode === QueueRepeatMode.TRACK ? 'Track' : queue.repeatMode === QueueRepeatMode.QUEUE ? 'Queue' : 'Off';
-            embed.setFooter({ text: `Queue: ${queue.tracks.size} tracks \vert{} Loop:${mode}` });
+            embed.setFooter({ text: `Queue: ${queue.tracks.size} tracks | Loop: ${mode}` });
         } else {
             embed.setDescription('*Nothing is currently playing. Add a song to get started!*');
             embed.setFooter({ text: 'Queue is empty' });
         }
-        
         await queue.metadata.panelMessage.edit({ embeds: [embed] });
-    } catch(e) { console.error("Panel Update Error:", e); }
+    } catch(e) { }
 }
 
 function startBot() {
@@ -62,13 +48,9 @@ function startBot() {
     const player = new Player(client);
     client.player = player;
     
-    player.events.on('error', (queue, error) => console.error('[Player Error]', error.message));
-    player.events.on('playerError', (queue, error) => console.error('[Audio Error]', error.message));
-    
-    player.events.on('playerStart', (queue, track) => {
-        logNowPlaying(queue.guild, track);
-        updatePanel(queue);
-    });
+    player.events.on('error', () => {});
+    player.events.on('playerError', () => {});
+    player.events.on('playerStart', (queue, track) => { logNowPlaying(queue.guild, track); updatePanel(queue); });
     player.events.on('audioTrackAdd', (queue) => updatePanel(queue));
     player.events.on('audioTracksAdd', (queue) => updatePanel(queue));
     player.events.on('audioTrackRemove', (queue) => updatePanel(queue));
@@ -76,41 +58,62 @@ function startBot() {
     player.events.on('disconnect', (queue) => updatePanel(queue));
 
     client.once('clientReady', async () => {
-        const { YoutubeiExtractor } = require('discord-player-youtubei');
-        await player.extractors.register(YoutubeiExtractor, {});
-        await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
+        try {
+            const { YoutubeiExtractor } = require('discord-player-youtubei');
+            await player.extractors.register(YoutubeiExtractor, {});
+            await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
+        } catch (e) {
+            await player.extractors.loadDefault();
+        }
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
+        
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
         const cmds = [
-            { name: 'summon', description: 'Summons the dynamic Miko Music Control Panel' },
+            { name: 'summon', description: 'Summons the Miko Music Control Panel' },
             { name: 'queue', description: 'Displays the current music queue' },
-            { 
-                name: 'move', 
-                description: 'Move a track in the queue', 
-                options: [
-                    { name: 'track', description: 'Current track number', type: 4, required: true },
-                    { name: 'position', description: 'New position number', type: 4, required: true }
-                ]
-            }
+            { name: 'move', description: 'Move a track', options: [ { name: 'track', description: 'Current #', type: 4, required: true }, { name: 'position', description: 'New #', type: 4, required: true } ] }
         ];
         await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: cmds });
         client.guilds.cache.forEach(g => rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, g.id), { body: cmds }).catch(()=>{}));
     });
 
-    async function handlePlayback(channel, rawQuery, interaction) {
+        async function handlePlayback(channel, rawQuery, interaction) {
         try {
-            const config = getConfig();
-            const playlists = config.savedPlaylists || [];
+            const playlists = getConfig().savedPlaylists || [];
             const cleanQuery = rawQuery.toLowerCase().trim();
             const matchedMacro = playlists.find(pl => pl.shortcode && pl.shortcode.toLowerCase() === cleanQuery);
-            const searchQuery = matchedMacro ? matchedMacro.url : rawQuery;
+            let safeQuery = matchedMacro ? matchedMacro.url : rawQuery;
+            let searchEngine = 'auto';
             
-            const result = await player.search(searchQuery, { requestedBy: interaction.user });
-            if (!result.hasTracks()) return interaction.followUp(`❌ No tracks found for: ${rawQuery}`);
+            // Aggressively sanitize YouTube URLs to bypass scraper blocks
+            if (safeQuery.includes('youtube.com') || safeQuery.includes('youtu.be')) {
+                try {
+                    const u = new URL(safeQuery.replace('music.youtube.com', 'www.youtube.com'));
+                    const listId = u.searchParams.get('list');
+                    const videoId = u.searchParams.get('v');
+                    if (listId) {
+                        safeQuery = `https://www.youtube.com/playlist?list=${listId}`;
+                        searchEngine = 'youtubePlaylist';
+                    } else if (videoId) {
+                        safeQuery = `https://www.youtube.com/watch?v=${videoId}`;
+                        searchEngine = 'youtubeVideo';
+                    }
+                } catch(e) {}
+            }
+            
+            let result = await player.search(safeQuery, { requestedBy: interaction.user, searchEngine: searchEngine });
+            
+            // Fallback to auto-detection if explicit engine fails
+            if (!result || !result.hasTracks()) {
+                result = await player.search(safeQuery, { requestedBy: interaction.user });
+            }
+            
+            if (!result || !result.hasTracks()) {
+                return interaction.followUp(`❌ No tracks found for: ${safeQuery}\n*(If this is a playlist, ensure it is set to Unlisted/Public)*`);
+            }
             
             const queue = player.nodes.create(interaction.guild, { metadata: { channel: interaction.channel, panelMessage: null }, leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false });
             if (!queue.connection) await queue.connect(channel);
-            
             await player.play(channel, result, { nodeOptions: { metadata: queue.metadata } });
             
             const title = result.playlist ? result.playlist.title : result.tracks[0].title;
@@ -118,8 +121,9 @@ function startBot() {
             await interaction.followUp({ content: `✅ Queued: **${title}**${aliasTag}`, ephemeral: true });
         } catch (err) {
             console.error("Playback Error:", err);
-            await interaction.followUp(`❌ Failed to play track. Ensure it's a valid URL.`);
+            await interaction.followUp(`❌ Failed to play track. Error: ${err.message}`);
         }
+    }
     }
 
     client.on('interactionCreate', async interaction => {
@@ -138,11 +142,7 @@ function startBot() {
                     const queue = player.nodes.create(interaction.guild, { leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false });
                     if (!queue.connection) await queue.connect(channel);
 
-                    const embed = new EmbedBuilder()
-                        .setColor('#89b4fa')
-                        .setTitle('🎛️ Miko Music Control Panel')
-                        .setDescription('*Nothing is currently playing. Add a song to get started!*');
-
+                    const embed = new EmbedBuilder().setColor('#89b4fa').setTitle('🎛️ Miko Music Control Panel').setDescription('*Nothing is currently playing.*');
                     const row1 = new ActionRowBuilder().addComponents(
                         new ButtonBuilder().setCustomId('btn_queue').setLabel('Queue').setStyle(ButtonStyle.Secondary),
                         new ButtonBuilder().setCustomId('btn_back').setLabel('Back').setStyle(ButtonStyle.Secondary),
@@ -153,46 +153,42 @@ function startBot() {
                     const row2 = new ActionRowBuilder().addComponents(
                         new ButtonBuilder().setCustomId('btn_loop').setLabel('Loop').setStyle(ButtonStyle.Secondary),
                         new ButtonBuilder().setCustomId('btn_shuffle').setLabel('Shuffle').setStyle(ButtonStyle.Secondary),
-                        new ButtonBuilder().setCustomId('btn_add').setLabel('🔍 Add Song/Shortcode').setStyle(ButtonStyle.Primary),
+                        new ButtonBuilder().setCustomId('btn_add').setLabel('🔍 Add Song').setStyle(ButtonStyle.Primary),
                         new ButtonBuilder().setCustomId('btn_playlists').setLabel('📂 Load Playlist').setStyle(ButtonStyle.Secondary)
                     );
-                    
                     const msg = await interaction.followUp({ embeds: [embed], components: [row1, row2], fetchReply: true });
                     queue.metadata = { panelMessage: msg, channel: interaction.channel };
                     updatePanel(queue);
                 }
-
                 if (interaction.commandName === 'queue') {
                     const queue = player.nodes.get(interaction.guildId);
-                    if (!queue) return interaction.reply({ content: 'Nothing is playing.', ephemeral: true });
-                    return interaction.reply({ embeds: [buildQueueEmbed(queue)], ephemeral: true });
+                    if (!queue) return interaction.reply({ content: 'Nothing playing.', ephemeral: true });
+                    const tracks = queue.tracks.toArray().slice(0, 10);
+                    const embed = new EmbedBuilder().setColor('#2b2d31').setTitle(`Music Queue`).setDescription(`**Now Playing**\n${queue.currentTrack?.title}\n\n**Up Next**\n${tracks.map((t,i)=>`**${i+1}.**${t.title}`).join('\n')}`);
+                    return interaction.reply({ embeds: [embed], ephemeral: true });
                 }
-
                 if (interaction.commandName === 'move') {
                     const queue = player.nodes.get(interaction.guildId);
                     if (!queue || queue.isEmpty()) return interaction.reply({ content: 'Queue is empty.', ephemeral: true });
                     const from = interaction.options.getInteger('track') - 1;
                     const to = interaction.options.getInteger('position') - 1;
                     const tracks = queue.tracks.toArray();
-                    
                     if (from < 0 || from >= tracks.length || to < 0) return interaction.reply({ content: 'Invalid track numbers.', ephemeral: true });
                     const track = tracks[from];
                     queue.node.remove(track);
                     queue.node.insert(track, to);
-                    
-                    await interaction.reply({ content: `✅ Moved **${track.title}** to position ${to + 1}.`, ephemeral: true });
+                    await interaction.reply({ content: `✅ Moved **${track.title}**`, ephemeral: true });
                     updatePanel(queue);
                 }
             }
-
             if (interaction.isButton()) {
                 const queue = player.nodes.get(interaction.guildId);
-
                 if (interaction.customId === 'btn_queue') {
-                    if (!queue) return interaction.reply({ content: 'Nothing is playing.', ephemeral: true });
-                    return interaction.reply({ embeds: [buildQueueEmbed(queue)], ephemeral: true });
+                    if (!queue) return interaction.reply({ content: 'Nothing playing.', ephemeral: true });
+                    const tracks = queue.tracks.toArray().slice(0, 10);
+                    const embed = new EmbedBuilder().setColor('#2b2d31').setTitle(`Music Queue`).setDescription(`**Now Playing**\n${queue.currentTrack?.title}\n\n**Up Next**\n${tracks.map((t,i)=>`**${i+1}.**${t.title}`).join('\n')}`);
+                    return interaction.reply({ embeds: [embed], ephemeral: true });
                 }
-
                 if (interaction.customId === 'btn_add') {
                     const modal = new ModalBuilder().setCustomId('modal_search').setTitle('Add Track, URL, or Shortcode');
                     modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('query').setLabel("Search query or shortcode").setStyle(TextInputStyle.Short).setRequired(true)));
@@ -200,7 +196,7 @@ function startBot() {
                 }
                 if (interaction.customId === 'btn_playlists') {
                     const config = getConfig();
-                    if (!config.savedPlaylists || !config.savedPlaylists.length) return interaction.reply({ content: 'No saved playlists.', ephemeral: true });
+                    if (!config.savedPlaylists || !config.savedPlaylists.length) return interaction.reply({ content: 'No playlists.', ephemeral: true });
                     const menu = new StringSelectMenuBuilder().setCustomId('menu_playlist').setPlaceholder('Select playlist');
                     config.savedPlaylists.slice(0, 25).forEach((pl, index) => { 
                         const codeStr = pl.shortcode ? ` [${pl.shortcode}]` : '';
@@ -208,75 +204,32 @@ function startBot() {
                     });
                     return await interaction.reply({ components: [new ActionRowBuilder().addComponents(menu)], ephemeral: true });
                 }
-
                 if (!queue) return interaction.reply({ content: 'Nothing playing.', ephemeral: true });
 
-                if (interaction.customId === 'btn_pause') {
-                    queue.node.setPaused(!queue.node.isPaused());
-                    await interaction.reply({ content: queue.node.isPaused() ? '⏸️ Paused.' : '▶️ Resumed.', ephemeral: true });
-                }
-                if (interaction.customId === 'btn_skip') {
-                    queue.node.skip();
-                    await interaction.reply({ content: '⏭️ Skipped.', ephemeral: true });
-                }
-                if (interaction.customId === 'btn_stop') {
-                    queue.delete();
-                    await interaction.reply({ content: '⏹️ Stopped and cleared.', ephemeral: true });
-                }
-                if (interaction.customId === 'btn_back') {
-                    if (!queue.history.previousTrack) return interaction.reply({ content: 'No previous track.', ephemeral: true });
-                    await queue.history.previous();
-                    await interaction.reply({ content: '⏮️ Playing previous.', ephemeral: true });
-                }
-                if (interaction.customId === 'btn_shuffle') {
-                    queue.tracks.shuffle();
-                    await interaction.reply({ content: '🔀 Queue shuffled.', ephemeral: true });
-                    updatePanel(queue);
-                }
+                if (interaction.customId === 'btn_pause') { queue.node.setPaused(!queue.node.isPaused()); await interaction.reply({ content: '⏯️ Toggled.', ephemeral: true }); }
+                if (interaction.customId === 'btn_skip') { queue.node.skip(); await interaction.reply({ content: '⏭️ Skipped.', ephemeral: true }); }
+                if (interaction.customId === 'btn_stop') { queue.delete(); await interaction.reply({ content: '⏹️ Stopped.', ephemeral: true }); }
+                if (interaction.customId === 'btn_back' && queue.history.previousTrack) { await queue.history.previous(); await interaction.reply({ content: '⏮️ Back.', ephemeral: true }); }
+                if (interaction.customId === 'btn_shuffle') { queue.tracks.shuffle(); await interaction.reply({ content: '🔀 Shuffled.', ephemeral: true }); updatePanel(queue); }
                 if (interaction.customId === 'btn_loop') {
-                    const currentMode = queue.repeatMode;
-                    let newMode = QueueRepeatMode.OFF;
-                    let msg = '🔁 Loop OFF';
-                    if (currentMode === QueueRepeatMode.OFF) { newMode = QueueRepeatMode.TRACK; msg = '🔂 Looping TRACK'; }
-                    else if (currentMode === QueueRepeatMode.TRACK) { newMode = QueueRepeatMode.QUEUE; msg = '🔁 Looping QUEUE'; }
-                    queue.setRepeatMode(newMode);
-                    await interaction.reply({ content: msg, ephemeral: true });
+                    const m = queue.repeatMode === QueueRepeatMode.OFF ? QueueRepeatMode.TRACK : queue.repeatMode === QueueRepeatMode.TRACK ? QueueRepeatMode.QUEUE : QueueRepeatMode.OFF;
+                    queue.setRepeatMode(m);
+                    await interaction.reply({ content: '🔁 Loop toggled.', ephemeral: true });
                     updatePanel(queue);
                 }
             }
-
             if (interaction.isModalSubmit() && interaction.customId === 'modal_search') {
                 await interaction.deferReply({ ephemeral: true });
                 await handlePlayback(interaction.member.voice.channel, interaction.fields.getTextInputValue('query'), interaction);
             }
             if (interaction.isStringSelectMenu() && interaction.customId === 'menu_playlist') {
                 await interaction.deferReply({ ephemeral: true });
-                const config = getConfig();
-                const url = config.savedPlaylists[parseInt(interaction.values[0])]?.url;
+                const url = getConfig().savedPlaylists[parseInt(interaction.values[0])]?.url;
                 if (!url) return interaction.followUp('❌ Could not find playlist URL.');
                 await handlePlayback(interaction.member.voice.channel, url, interaction);
             }
-        } catch (err) {
-            console.error('Interaction Event Error:', err);
-            try { await interaction.reply({ content: '❌ An error occurred.', ephemeral: true }); } catch(e){}
-        }
+        } catch (err) { try { await interaction.reply({ content: '❌ An error occurred.', ephemeral: true }); } catch(e){} }
     });
-
-    function buildQueueEmbed(queue) {
-        const tracks = queue.tracks.toArray().slice(0, 10);
-        const embed = new EmbedBuilder()
-            .setColor('#2b2d31')
-            .setTitle(`Music Queue for ${queue.guild.name}`)
-            .setDescription(`**Queue Length:** ${queue.tracks.size} tracks\n\n**Now Playing**\n[${queue.currentTrack?.title}](${queue.currentTrack?.url}) • \`[${queue.currentTrack?.duration}]\` • \`${queue.currentTrack?.requestedBy?.username || 'Auto'}\`\n\n**Queue List**`);
-        
-        if (tracks.length > 0) {
-            const listStr = tracks.map((t, i) => `**(${i+1}).** [${t.title}](${t.url}) • \`[${t.duration}]\` • \`${t.requestedBy?.username || 'Auto'}\``).join('\n');
-            embed.setDescription(embed.data.description + '\n' + listStr);
-        } else {
-            embed.setDescription(embed.data.description + '\n*Queue is currently empty.*');
-        }
-        return embed;
-    }
 
     client.login(process.env.DISCORD_TOKEN);
     return client;
