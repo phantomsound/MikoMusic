@@ -91,12 +91,12 @@ function startBot() {
         try {
             console.log("Loading Extractor Engines...");
             
-            // 1. Explicitly import and register the required Android TV Youtube Engine
+            // 1. Explicitly register the Android TV YouTube engine
             const { YoutubeiExtractor } = require('discord-player-youtubei');
             await player.extractors.register(YoutubeiExtractor, {});
             console.log("✅ YoutubeiExtractor (Android TV) Registered");
 
-            // 2. Load Spotify, Apple Music, and SoundCloud
+            // 2. Load all other remaining safe Default Extractors (Spotify, Apple, SoundCloud)
             const { DefaultExtractors } = require('@discord-player/extractor');
             await player.extractors.loadMulti(DefaultExtractors);
             
