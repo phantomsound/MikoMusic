@@ -69,10 +69,7 @@ async function ensureStandbyBanner(client) {
 
 function startBot() {
     const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
-    
-    const player = new Player(client, {
-        ytdlOptions: { quality: 'highestaudio', highWaterMark: 1 << 25 }
-    });
+    const player = new Player(client);
     client.player = player;
     
     player.events.on('error', (q, e) => console.log('Player Error:', e.message));
@@ -88,53 +85,27 @@ function startBot() {
     player.events.on('volumeChange', (queue) => updatePanel(queue));
 
     client.once('clientReady', async () => {
-        const { SpotifyExtractor, AppleMusicExtractor, SoundCloudExtractor, YouTubeExtractor } = require('@discord-player/extractor');
-        let bridgeLoaded = false;
-
-        // TIER 1: Android TV Bypass (VEVO/DRM Immune)
         try {
-            const pkg = require('discord-player-youtubei');
-            const YoutubeiExt = pkg.YoutubeiExtractor || pkg.default;
-            if (YoutubeiExt) {
-                // Dynamically patch the missing developer tag that caused the crash
-                if (!YoutubeiExt.identifier) YoutubeiExt.identifier = 'YoutubeiExtractor';
-                await player.extractors.register(YoutubeiExt, {});
-                await player.extractors.register(SpotifyExtractor, { bridgeProvider: YoutubeiExt });
-                await player.extractors.register(AppleMusicExtractor, { bridgeProvider: YoutubeiExt });
-                console.log('✅ TIER 1: Android TV Spoofing Engaged. Spotify locked.');
-                bridgeLoaded = true;
-            }
-        } catch (err) {
-            console.log('⚠️ Android TV bypass crashed, failing over to Tier 2...');
-        }
+            console.log("Loading Extractor Engines...");
+            const { SpotifyExtractor, AppleMusicExtractor, SoundCloudExtractor } = require('@discord-player/extractor');
+            const { YoutubeiExtractor } = require('discord-player-youtubei');
 
-        // TIER 2: Official YouTube-Ext (IP Ban Evasion)
-        if (!bridgeLoaded) {
-            try {
-                await player.extractors.register(YouTubeExtractor, { useClient: 'youtube-ext' });
-                await player.extractors.register(SpotifyExtractor, { bridgeProvider: YouTubeExtractor });
-                await player.extractors.register(AppleMusicExtractor, { bridgeProvider: YouTubeExtractor });
-                console.log('✅ TIER 2: Default YouTube-Ext Bridge Engaged. Spotify locked.');
-                bridgeLoaded = true;
-            } catch (err) {
-                console.log('⚠️ Tier 2 unavailable, failing over to Tier 3...');
-            }
-        }
-        
-        // TIER 3: Play-DL (Absolute Fallback)
-        if (!bridgeLoaded) {
-            try {
-                await player.extractors.register(YouTubeExtractor, { useClient: 'play-dl' });
-                await player.extractors.register(SpotifyExtractor, { bridgeProvider: YouTubeExtractor });
-                await player.extractors.register(AppleMusicExtractor, { bridgeProvider: YouTubeExtractor });
-                console.log('✅ TIER 3: Play-DL Bridge Engaged. Spotify locked.');
-            } catch (err) {
-                console.log('❌ FATAL: All routing failed.');
-            }
-        }
+            // 1. Explicitly register Android TV bypass FIRST
+            await player.extractors.register(YoutubeiExtractor, {});
+            console.log("✅ YoutubeiExtractor (Android TV Bypass) Registered");
 
-        // Register final standalone extractors
-        try { await player.extractors.register(SoundCloudExtractor, {}); } catch(e){}
+            // 2. Explicitly register Spotify and map it directly to the TV Bypass to dodge VEVO DRM
+            await player.extractors.register(SpotifyExtractor, { bridgeProvider: YoutubeiExtractor });
+            console.log("✅ SpotifyExtractor Registered & Bridged to TV Spoofing");
+
+            // 3. Register standalone fallbacks
+            await player.extractors.register(AppleMusicExtractor, { bridgeProvider: YoutubeiExtractor });
+            await player.extractors.register(SoundCloudExtractor, {});
+            
+            console.log(`✅ All Extractors Online: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
+        } catch (e) {
+            console.error("❌ FATAL EXTRACTOR BOOT ERROR:", e.stack);
+        }
         
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
         await ensureStandbyBanner(client);

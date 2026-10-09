@@ -16,6 +16,13 @@ function updateConfig(newValues) {
     fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
 }
 
+// Dynamically tracks the active server where the music is playing to prevent dashboard UI desyncs
+function getActiveGuild(discordClient) {
+    const activeNode = discordClient.player?.nodes?.cache?.first();
+    if (activeNode) return activeNode.guild;
+    return discordClient.guilds.cache.first();
+}
+
 function startServer(discordClient) {
     app.get('/api/config', (req, res) => {
         try {
@@ -25,13 +32,13 @@ function startServer(discordClient) {
     });
 
     app.get('/api/server-info', (req, res) => {
-        const guild = discordClient.guilds.cache.first();
+        const guild = getActiveGuild(discordClient);
         res.json({ serverName: guild ? guild.name : "Not Connected" });
     });
 
     app.get('/api/channels', (req, res) => {
         try {
-            const guild = discordClient.guilds.cache.first();
+            const guild = getActiveGuild(discordClient);
             if (!guild) return res.json([]);
             res.json(guild.channels.cache.filter(c => c.isTextBased()).map(c => ({ id: c.id, name: c.name })));
         } catch (e) { res.json([]); }
@@ -39,7 +46,7 @@ function startServer(discordClient) {
 
     app.get('/api/voice-channels', (req, res) => {
         try {
-            const guild = discordClient.guilds.cache.first();
+            const guild = getActiveGuild(discordClient);
             if (!guild) return res.json([]);
             res.json(guild.channels.cache.filter(c => c.isVoiceBased()).map(c => ({ id: c.id, name: c.name })));
         } catch (e) { res.json([]); }
@@ -71,7 +78,7 @@ function startServer(discordClient) {
     app.post('/api/voice', async (req, res) => {
         try {
             const { action, channelId } = req.body;
-            const guild = discordClient.guilds.cache.first();
+            const guild = getActiveGuild(discordClient);
             if (!guild) return res.json({ success: false, message: "No active Discord server found." });
 
             if (action === 'join') {
@@ -103,7 +110,7 @@ function startServer(discordClient) {
     app.post('/api/play', async (req, res) => {
         try {
             const { query } = req.body;
-            const guild = discordClient.guilds.cache.first();
+            const guild = getActiveGuild(discordClient);
             if (!guild) return res.json({ success: false, message: "No server connected." });
 
             const queue = discordClient.player.nodes.get(guild.id);
