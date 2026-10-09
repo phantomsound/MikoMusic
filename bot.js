@@ -59,12 +59,12 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            // Deploy the play-dl client bypass to evade YouTube's 403 Forbidden blocks
-            await player.extractors.loadDefault({
-                youtube: {
-                    useClient: 'play-dl'
-                }
-            });
+            const { YoutubeiExtractor } = require('discord-player-youtubei');
+            // 1. Disable the broken default YouTube scrapers completely
+            await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
+            // 2. Register the Internal API Bypass
+            await player.extractors.register(YoutubeiExtractor, {});
+            console.log("✅ YouTubei Internal API Extractor Loaded.");
         } catch (e) { console.error("Extractor Load Error:", e); }
         
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
@@ -90,7 +90,16 @@ function startBot() {
                 safeQuery = safeQuery.replace('music.youtube.com', 'www.youtube.com');
             }
             
-            const result = await player.search(safeQuery, { requestedBy: interaction.user });
+            // Explicitly force the engine to use the YouTubei API Extractor
+            let result = await player.search(safeQuery, { 
+                requestedBy: interaction.user,
+                searchEngine: 'youtubei' 
+            });
+            
+            // Fallback to auto-detect if forced engine flags it as unknown
+            if (!result || !result.hasTracks()) {
+                result = await player.search(safeQuery, { requestedBy: interaction.user });
+            }
             
             if (!result || !result.hasTracks()) {
                 return interaction.followUp(`❌ No tracks found for: ${safeQuery}\n*(YouTube may be rate-limiting this specific query)*`);
@@ -115,16 +124,13 @@ function startBot() {
                 if (interaction.commandName === 'summon') {
                     const channel = interaction.member.voice.channel;
                     if (!channel) return interaction.reply({ content: '❌ You must be in a voice channel!', ephemeral: true });
-
                     const config = getConfig();
                     if (config.panelChannelId && interaction.channelId !== config.panelChannelId) {
                         return interaction.reply({ content: `❌ Please use the dedicated music panel channel.`, ephemeral: true });
                     }
-
                     await interaction.deferReply();
                     const queue = player.nodes.create(interaction.guild, { leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false });
                     if (!queue.connection) await queue.connect(channel);
-
                     const embed = new EmbedBuilder().setColor('#89b4fa').setTitle('🎛️ Miko Music Control Panel').setDescription('*Nothing is currently playing.*');
                     const row1 = new ActionRowBuilder().addComponents(
                         new ButtonBuilder().setCustomId('btn_queue').setLabel('Queue').setStyle(ButtonStyle.Secondary),
