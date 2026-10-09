@@ -1,6 +1,4 @@
-﻿process.env.DP_FORCE_YTDL_MOD = 'youtube-ext';
-
-const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
+﻿const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
 const { Player, QueueRepeatMode } = require('discord-player');
 const fs = require('fs');
 const logger = require('./logger');
@@ -78,7 +76,7 @@ function startBot() {
     logger.initLogger(client);
 
     player.events.on('error', (q, e) => console.log('❌ Player Error:', e.message));
-    player.events.on('playerError', (q, e) => console.log('❌ Stream Blocked (403):', e.message));
+    player.events.on('playerError', (q, e) => console.log('❌ Stream Blocked:', e.message));
     player.events.on('playerSkip', (q, track) => console.log(`⚠️ Skipped Track: ${track.title}`));
     
     player.events.on('playerStart', (queue, track) => { logNowPlaying(queue.guild, track); updatePanel(queue); });
@@ -91,12 +89,15 @@ function startBot() {
 
     client.once('clientReady', async () => {
         try {
-            const { DefaultExtractors, YouTubeExtractor } = require('@discord-player/extractor');
+            console.log("Loading Extractor Engines...");
             
-            // THE FIX: Explicitly register YouTube Extractor FIRST so Spotify can bridge to it
-            await player.extractors.register(YouTubeExtractor, {});
-            
-            // Then load all the other default extractors
+            // 1. Explicitly import and register the required Android TV Youtube Engine
+            const { YoutubeiExtractor } = require('discord-player-youtubei');
+            await player.extractors.register(YoutubeiExtractor, {});
+            console.log("✅ YoutubeiExtractor (Android TV) Registered");
+
+            // 2. Load Spotify, Apple Music, and SoundCloud
+            const { DefaultExtractors } = require('@discord-player/extractor');
             await player.extractors.loadMulti(DefaultExtractors);
             
             console.log(`✅ Extractors Active: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
