@@ -78,10 +78,14 @@
 
     <div id="tab-main" class="tab-content active">
         <div class="card full" style="border-left: 4px solid var(--blue);">
-            <h3>📡 Remote Voice Connection</h3>
-            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                <select id="voiceChannelSelect" style="max-width: 320px;"><option value="">-- Select Voice Channel --</option></select>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <h3 style="margin: 0;">📡 Remote Voice Connection</h3>
+                <span id="connectedVcStatus" style="font-size: 0.88rem; font-weight: bold;"></span>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 0.8rem;">
+                <select id="voiceChannelSelect" style="max-width: 360px;"><option value="auto">🎯 Auto-Detect (Join Where People Are)</option></select>
                 <button onclick="manageVoice('join')" class="btn-success">🔊 Join Channel</button>
+                <button onclick="setDefaultVoiceChannel()" class="btn-secondary" title="Save selected channel as default for this server">⭐ Set Default</button>
                 <button onclick="manageVoice('disconnect')" class="btn-danger">🔇 Disconnect</button>
             </div>
         </div>
@@ -267,6 +271,10 @@
     <script>
         let cachedPlaylists = [], isFirstLoad = true, draggedIndex = null, isMuted = false, preMuteVol = 100, currentQueueState = { current: null, tracks: [] };
 
+        function apiFetch(url, options = {}) {
+            return fetch(url, { cache: 'no-store', ...options });
+        }
+
         function getActiveGuildId() { return document.getElementById('guildSelector').value; }
 
         function switchTab(id) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); document.querySelector(`.tab-btn[onclick="switchTab('${id}')"]`).classList.add('active'); document.getElementById(`tab-${id}`).classList.add('active'); }
@@ -276,7 +284,7 @@
         function switchGuildContext() { loadChannels(); refreshQueue(); }
 
         function updateServerInfo() {
-            fetch('/api/server-info').then(r => r.json()).then(data => {
+            apiFetch('/api/server-info').then(r => r.json()).then(data => {
                 document.getElementById('hostBadge').innerText = data.hostName;
                 document.getElementById('systemTimeLabel').innerText = data.systemTime;
                 const statusBadge = document.getElementById('botStatusBadge');
@@ -312,7 +320,7 @@
         function loadConfig() {
             updateServerInfo();
 
-            fetch('/api/config').then(r => r.json()).then(data => {
+            apiFetch('/api/config').then(r => r.json()).then(data => {
                 if (data.dashboardName) document.getElementById('dashTitle').innerText = data.dashboardName;
                 if (data.logRetentionDays) document.getElementById('logRetentionDays').value = data.logRetentionDays;
                 if (data.logLevel) document.getElementById('logLevel').value = data.logLevel;
@@ -336,7 +344,7 @@
             const payload = {};
             if (token) payload.discordToken = token;
             if (cid) payload.clientId = cid;
-            fetch('/api/settings', {
+            apiFetch('/api/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -349,19 +357,45 @@
 
         function loadChannels() {
             const guildId = getActiveGuildId();
-            fetch(`/api/channels?guildId=${guildId}`).then(r => r.json()).then(channels => {
+            apiFetch(`/api/channels?guildId=${guildId}`).then(r => r.json()).then(channels => {
                 const panel = document.getElementById('panelChannelId'), log = document.getElementById('logChannelId');
                 panel.innerHTML = '<option value="">-- No Restriction --</option>'; log.innerHTML = '<option value="">-- Do Not Send Logs --</option>';
                 channels.forEach(c => { panel.innerHTML += `<option value="${c.id}">${c.name}</option>`; log.innerHTML += `<option value="${c.id}">${c.name}</option>`; });
-                fetch('/api/config').then(r => r.json()).then(data => {
+                apiFetch('/api/config').then(r => r.json()).then(data => {
                     if (data.panelChannelId) panel.value = data.panelChannelId;
                     if (data.logChannelId) log.value = data.logChannelId;
                 });
             });
-            fetch(`/api/voice-channels?guildId=${guildId}`).then(r => r.json()).then(channels => {
+            apiFetch(`/api/voice-channels?guildId=${guildId}`).then(r => r.json()).then(channels => {
                 const vcSelect = document.getElementById('voiceChannelSelect');
-                vcSelect.innerHTML = '<option value="">-- Select Voice Channel --</option>';
-                channels.forEach(c => vcSelect.innerHTML += `<option value="${c.id}">${c.name}</option>`);
+                const currVal = vcSelect.value;
+                vcSelect.innerHTML = '<option value="auto">🎯 Auto-Detect (Join Where People Are)</option>';
+                channels.forEach(c => {
+                    const countTag = c.userCount > 0 ? ` (${c.userCount} active 👥)` : '';
+                    const defTag = c.isDefault ? ' ⭐ [Default]' : '';
+                    vcSelect.innerHTML += `<option value="${c.id}">${escapeHTML(c.name)}${countTag}${defTag}</option>`;
+                });
+                if (currVal && Array.from(vcSelect.options).some(o => o.value === currVal)) {
+                    vcSelect.value = currVal;
+                }
+            });
+        }
+
+        function setDefaultVoiceChannel() {
+            const channelId = document.getElementById('voiceChannelSelect').value;
+            const guildId = getActiveGuildId();
+            if (!channelId || channelId === 'auto') return alert('Please select a specific voice channel first to set it as default.');
+            apiFetch('/api/voice/default', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ guildId, channelId })
+            }).then(r => r.json()).then(res => {
+                if (res.success) {
+                    alert('Default voice channel saved!');
+                    loadChannels();
+                } else {
+                    alert(res.message || 'Error saving default voice channel.');
+                }
             });
         }
 
@@ -374,10 +408,10 @@
             hl.innerHTML = historyArray.map(h => `<li><strong>${escapeHTML(h.name)}</strong> <span class="history-time">${h.time}</span></li>`).join('');
         }
 
-        function fetchLogs() { fetch('/api/logs').then(r => r.json()).then(data => { const b = document.getElementById('terminalBox'); b.innerText = data.logs || "Log file empty."; b.scrollTop = b.scrollHeight; }); }
+        function fetchLogs() { apiFetch('/api/logs').then(r => r.json()).then(data => { const b = document.getElementById('terminalBox'); b.innerText = data.logs || "Log file empty."; b.scrollTop = b.scrollHeight; }); }
 
         function saveToolsConfig() {
-            fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ 
+            apiFetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ 
                 logRetentionDays: parseInt(document.getElementById('logRetentionDays').value), logLevel: document.getElementById('logLevel').value,
                 logDirectory: document.getElementById('logDirectory').value.trim(), logBackupSchedule: document.getElementById('logBackupSchedule').value,
                 spotifyClientId: document.getElementById('spotifyClientId').value.trim(), spotifyClientSecret: document.getElementById('spotifyClientSecret').value.trim(),
@@ -385,11 +419,11 @@
             })}).then(() => alert(`Tool settings saved successfully!`));
         }
 
-        function restartService() { if (confirm("Restart the Miko Music Bot service now? Audio will disconnect for 5-10 seconds.")) fetch('/api/system/restart', { method: 'POST' }).then(() => alert('Restart command issued.')); }
+        function restartService() { if (confirm("Restart the Miko Music Bot service now? Audio will disconnect for 5-10 seconds.")) apiFetch('/api/system/restart', { method: 'POST' }).then(() => alert('Restart command issued.')); }
 
         function refreshQueue() {
             const guildId = getActiveGuildId();
-            fetch(`/api/queue?guildId=${guildId}`).then(r => r.json()).then(data => {
+            apiFetch(`/api/queue?guildId=${guildId}`).then(r => r.json()).then(data => {
                 currentQueueState = data;
                 document.getElementById('activeNowPlaying').innerText = data.current ? `▶️ Now Playing: ${data.current}` : '▶️ Nothing Playing';
                 const qc = document.getElementById('queueContainer');
@@ -410,10 +444,12 @@
                     isFirstLoad = false; 
                 }
                 
-                if (data.voiceChannelId) {
-                    const dropdown = document.getElementById('voiceChannelSelect');
-                    if (dropdown && dropdown.value !== data.voiceChannelId) {
-                        dropdown.value = data.voiceChannelId;
+                const vcStatus = document.getElementById('connectedVcStatus');
+                if (vcStatus) {
+                    if (data.voiceChannelName) {
+                        vcStatus.innerHTML = `<span style="color: var(--green);">Connected: <b>🔊 ${escapeHTML(data.voiceChannelName)}</b></span>`;
+                    } else {
+                        vcStatus.innerHTML = `<span style="color: #a6adc8;">Not in voice channel</span>`;
                     }
                 }
 
@@ -441,29 +477,39 @@
         }
 
         function confirmRemoveTrackApi(index) { if(confirm('Remove this track from the active queue?')) removeTrackApi(index); }
-        function removeTrackApi(index) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'remove', index, guildId: getActiveGuildId() }) }).then(() => refreshQueue()); }
-        function moveTrackApi(from, to) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move', from, to, guildId: getActiveGuildId() }) }).then(() => refreshQueue()); }
+        function removeTrackApi(index) { apiFetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'remove', index, guildId: getActiveGuildId() }) }).then(() => refreshQueue()); }
+        function moveTrackApi(from, to) { apiFetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move', from, to, guildId: getActiveGuildId() }) }).then(() => refreshQueue()); }
         function manualMoveTrack() { const f = document.getElementById('moveFrom').value, t = document.getElementById('moveTo').value; if (!f || !t) return; moveTrackApi(parseInt(f), parseInt(t)); document.getElementById('moveFrom').value = ''; document.getElementById('moveTo').value = ''; }
 
         setInterval(refreshQueue, 3500); setInterval(fetchLogs, 5000); setInterval(updateServerInfo, 10000);
 
-        function editDashName() { const n = prompt("Enter new dashboard name:", document.getElementById('dashTitle').innerText); if (n && n.trim() !== '') fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dashboardName: n.trim() }) }).then(() => document.getElementById('dashTitle').innerText = n.trim()); }
-        function manageVoice(action) { const channelId = document.getElementById('voiceChannelSelect').value; fetch('/api/voice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, channelId, guildId: getActiveGuildId() }) }).then(r => r.json()).then(res => { if(!res.success) alert(res.message); }); }
+        function editDashName() { const n = prompt("Enter new dashboard name:", document.getElementById('dashTitle').innerText); if (n && n.trim() !== '') apiFetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dashboardName: n.trim() }) }).then(() => document.getElementById('dashTitle').innerText = n.trim()); }
+        function manageVoice(action) { 
+            const channelId = document.getElementById('voiceChannelSelect').value; 
+            apiFetch('/api/voice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, channelId, guildId: getActiveGuildId() }) }).then(r => r.json()).then(res => { 
+                if(!res.success) alert(res.message); 
+                else if (action === 'join' && res.channelName) {
+                    const vcStatus = document.getElementById('connectedVcStatus');
+                    if (vcStatus) vcStatus.innerHTML = `<span style="color: var(--green);">Connected: <b>🔊 ${escapeHTML(res.channelName)}</b></span>`;
+                }
+                refreshQueue(); 
+            }); 
+        }
         
         function toggleMute() { const s = document.getElementById('volSlider'); if (isMuted) { isMuted = false; s.value = preMuteVol; document.getElementById('muteToggleBtn').innerText = '🔊'; } else { isMuted = true; preMuteVol = s.value == 0 ? 100 : s.value; s.value = 0; document.getElementById('muteToggleBtn').innerText = '🔇'; } setVolume(); }
-        function setVolume() { const vol = document.getElementById('volSlider').value; document.getElementById('volLabel').innerText = vol; if (vol > 0 && isMuted) { isMuted = false; document.getElementById('muteToggleBtn').innerText = '🔊'; } else if (vol == 0 && !isMuted) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; } fetch('/api/volume', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ volume: vol, guildId: getActiveGuildId() }) }); }
+        function setVolume() { const vol = document.getElementById('volSlider').value; document.getElementById('volLabel').innerText = vol; if (vol > 0 && isMuted) { isMuted = false; document.getElementById('muteToggleBtn').innerText = '🔊'; } else if (vol == 0 && !isMuted) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; } apiFetch('/api/volume', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ volume: vol, guildId: getActiveGuildId() }) }); }
 
         async function directLoadPlaylist(url) {
             if (confirm("Clear active queue and stream this playlist now?")) {
-                await fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop', guildId: getActiveGuildId() }) });
+                await apiFetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop', guildId: getActiveGuildId() }) });
                 await new Promise(r => setTimeout(r, 400));
-                fetch('/api/play', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: url, guildId: getActiveGuildId() }) }).then(() => { refreshQueue(); fetchLogs(); });
+                apiFetch('/api/play', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: url, guildId: getActiveGuildId() }) }).then(() => { refreshQueue(); fetchLogs(); });
             }
         }
 
         async function remotePlay() {
             const q = document.getElementById('remotePlayInput').value.trim(); if (!q) return;
-            fetch('/api/play', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q, guildId: getActiveGuildId() }) }).then(r => r.json()).then(res => { if (!res.success) alert(res.message); else { document.getElementById('remotePlayInput').value = ''; refreshQueue(); fetchLogs(); } });
+            apiFetch('/api/play', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q, guildId: getActiveGuildId() }) }).then(r => r.json()).then(res => { if (!res.success) alert(res.message); else { document.getElementById('remotePlayInput').value = ''; refreshQueue(); fetchLogs(); } });
         }
 
         function syncPlaylistsFromDOM() { const s = []; for (let i = 0; i < cachedPlaylists.length; i++) { s.push({ name: document.getElementById(`pl-name-${i}`)?.value ?? cachedPlaylists[i]?.name ?? '', shortcode: document.getElementById(`pl-code-${i}`)?.value ?? cachedPlaylists[i]?.shortcode ?? '', url: document.getElementById(`pl-url-${i}`)?.value ?? cachedPlaylists[i]?.url ?? '' }); } cachedPlaylists = s; }
@@ -488,10 +534,10 @@
         function confirmRemovePlaylistRow(i) { if(confirm('Are you sure you want to delete this playlist macro?')) removePlaylistRow(i); }
         function addEmptyPlaylistRow() { syncPlaylistsFromDOM(); cachedPlaylists.push({ name: '', shortcode: '', url: '' }); renderPlaylists(); }
         function removePlaylistRow(i) { syncPlaylistsFromDOM(); cachedPlaylists.splice(i, 1); renderPlaylists(); }
-        function savePlaylists() { syncPlaylistsFromDOM(); const np = []; for (let i = 0; i < cachedPlaylists.length; i++) { const n = cachedPlaylists[i].name?.trim(), c = (cachedPlaylists[i].shortcode || '').toLowerCase().trim(), u = cachedPlaylists[i].url?.trim(); if (n && u) np.push({ name: n, shortcode: c, url: u }); } fetch('/api/playlists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playlists: np }) }).then(() => { alert('Playlists saved successfully!'); loadConfig(); }); }
+        function savePlaylists() { syncPlaylistsFromDOM(); const np = []; for (let i = 0; i < cachedPlaylists.length; i++) { const n = cachedPlaylists[i].name?.trim(), c = (cachedPlaylists[i].shortcode || '').toLowerCase().trim(), u = cachedPlaylists[i].url?.trim(); if (n && u) np.push({ name: n, shortcode: c, url: u }); } apiFetch('/api/playlists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playlists: np }) }).then(() => { alert('Playlists saved successfully!'); loadConfig(); }); }
         
         function openDiscordInvite() {
-            fetch('/api/config').then(r => r.json()).then(data => {
+            apiFetch('/api/config').then(r => r.json()).then(data => {
                 const id = data.clientId || prompt("Paste your Application ID:");
                 if (id) {
                     const a = document.createElement('a');
@@ -504,7 +550,7 @@
             });
         }
         
-        function controlPlayer(action) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, guildId: getActiveGuildId() }) }).then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); fetchLogs(); }); }
+        function controlPlayer(action) { apiFetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, guildId: getActiveGuildId() }) }).then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); fetchLogs(); }); }
 
         loadConfig();
     </script>

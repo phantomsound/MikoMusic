@@ -225,6 +225,46 @@ function renderQueueEmbed(queue, page = 1) {
     return { embeds: [embed], components: [row] };
 }
 
+function resolveTargetVoiceChannel(guild, preferredChannelId = null) {
+    if (!guild) return null;
+    const config = getConfig();
+
+    // 1. Explicit channel requested (and not 'auto')
+    if (preferredChannelId && preferredChannelId !== 'auto') {
+        const c = guild.channels.cache.get(preferredChannelId);
+        if (c && c.isVoiceBased()) return c;
+    }
+
+    // 2. Scan voice channels in this guild with human members (sorted by most users)
+    const voiceChannels = guild.channels.cache.filter(c => c.isVoiceBased());
+    const channelsWithUsers = voiceChannels
+        .map(c => ({ channel: c, users: c.members.filter(m => !m.user.bot).size }))
+        .filter(x => x.users > 0)
+        .sort((a, b) => b.users - a.users);
+
+    if (channelsWithUsers.length > 0) {
+        logger.info(`🎯 Auto-detected active voice channel with ${channelsWithUsers[0].users} user(s): ${channelsWithUsers[0].channel.name}`);
+        return channelsWithUsers[0].channel;
+    }
+
+    // 3. Fall back to per-guild default voice channel
+    const guildDefault = config.defaultVoiceChannels && config.defaultVoiceChannels[guild.id];
+    if (guildDefault && guild.channels.cache.has(guildDefault)) {
+        const c = guild.channels.cache.get(guildDefault);
+        if (c && c.isVoiceBased()) return c;
+    }
+
+    // 4. Fall back to global defaultVoiceChannelId or lastVoiceChannelId
+    const fallbackId = config.defaultVoiceChannelId || config.lastVoiceChannelId;
+    if (fallbackId && guild.channels.cache.has(fallbackId)) {
+        const c = guild.channels.cache.get(fallbackId);
+        if (c && c.isVoiceBased()) return c;
+    }
+
+    // 5. Fall back to first available voice channel
+    return voiceChannels.first() || null;
+}
+
 async function deployControlPanel(guild, voiceChannel, targetTextChannel, interaction = null) {
     const config = getConfig();
     let queue = player.nodes.get(guild.id);
@@ -605,8 +645,18 @@ async function startDiscordBot() {
 
 // EXPRESS WEB API SERVER
 const app = express();
+app.set('etag', false);
 app.use(express.json());
-app.use(express.static('public'));
+app.use((req, res, next) => {
+    res.set({
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Surrogate-Control': 'no-store'
+    });
+    next();
+});
+app.use(express.static('public', { etag: false, lastModified: false }));
 
 app.get('/api/server-info', (req, res) => {
     const guilds = client.guilds ? client.guilds.cache.map(g => ({ id: g.id, name: g.name })) : [];
@@ -629,6 +679,8 @@ app.get('/api/config', (req, res) => {
         dashboardName: config.dashboardName || 'Miko Music Dashboard',
         panelChannelId: config.panelChannelId || '',
         logChannelId: config.logChannelId || '',
+        defaultVoiceChannelId: config.defaultVoiceChannelId || '',
+        defaultVoiceChannels: config.defaultVoiceChannels || {},
         logRetentionDays: config.logRetentionDays || 7,
         logLevel: config.logLevel || 'normal',
         logDirectory: config.logDirectory || path.join(__dirname, 'logs'),
@@ -656,12 +708,22 @@ app.get('/api/channels', (req, res) => {
 
 app.get('/api/voice-channels', (req, res) => {
     if (!client.guilds) return res.json([]);
+    const config = getConfig();
     const guildId = req.query.guildId;
     const targetGuilds = guildId ? client.guilds.cache.filter(g => g.id === guildId) : client.guilds.cache;
     const channels = [];
     targetGuilds.forEach(g => {
+        const guildDefault = (config.defaultVoiceChannels && config.defaultVoiceChannels[g.id]) || config.defaultVoiceChannelId;
         g.channels.cache.filter(c => c.isVoiceBased()).forEach(c => {
-            channels.push({ id: c.id, name: `${g.name} - 🔊 ${c.name}` });
+            const humans = c.members.filter(m => !m.user.bot).size;
+            channels.push({ 
+                id: c.id, 
+                name: c.name,
+                fullName: `${g.name} - 🔊 ${c.name}`,
+                guildId: g.id,
+                userCount: humans,
+                isDefault: (guildDefault === c.id)
+            });
         });
     });
     res.json(channels);
@@ -726,12 +788,16 @@ app.get('/api/queue', (req, res) => {
     const queue = guildId ? client.player?.nodes?.get(guildId) : client.player?.nodes?.cache?.first();
     const config = getConfig();
     let vcId = null;
+    let vcName = null;
 
     if (client.guilds) {
         const targetGuild = guildId ? client.guilds.cache.get(guildId) : client.guilds.cache.first();
         if (targetGuild) {
             const member = targetGuild.members.cache.get(client.user?.id);
-            if (member && member.voice?.channelId) vcId = member.voice.channelId;
+            if (member && member.voice?.channel) {
+                vcId = member.voice.channel.id;
+                vcName = member.voice.channel.name;
+            }
         }
     }
 
@@ -740,7 +806,7 @@ app.get('/api/queue', (req, res) => {
     const history = config.history || [];
 
     if (!queue) {
-        return res.json({ current: null, tracks: [], volume: defVol, voiceChannelId: finalVcId, history });
+        return res.json({ current: null, tracks: [], volume: defVol, voiceChannelId: finalVcId, voiceChannelName: vcName, history });
     }
 
     const tracks = queue.tracks.toArray().map((t, i) => ({
@@ -756,6 +822,7 @@ app.get('/api/queue', (req, res) => {
         tracks,
         volume: queue.node.volume,
         voiceChannelId: finalVcId,
+        voiceChannelName: vcName,
         history
     });
 });
@@ -768,19 +835,22 @@ app.post('/api/play', async (req, res) => {
     const safeQuery = sanitizeQuery(query, config.savedPlaylists);
 
     let vc = null, txt = null;
-    if (client.guilds) {
-        const targetGuilds = guildId ? client.guilds.cache.filter(g => g.id === guildId) : client.guilds.cache;
-        targetGuilds.forEach(g => {
-            const member = g.members.cache.get(client.user?.id);
-            if (member && member.voice.channel) vc = member.voice.channel;
-            if (config.panelChannelId && g.channels.cache.has(config.panelChannelId)) {
-                txt = g.channels.cache.get(config.panelChannelId);
-            }
-        });
+    const targetGuild = guildId ? client.guilds?.cache.get(guildId) : client.guilds?.cache.first();
+    if (!targetGuild) return res.json({ success: false, message: 'Server not found' });
+
+    const member = targetGuild.members.cache.get(client.user?.id);
+    if (member && member.voice?.channel) {
+        vc = member.voice.channel;
+    } else {
+        vc = resolveTargetVoiceChannel(targetGuild);
     }
 
-    if (!vc) return res.json({ success: false, message: 'Bot is not in a voice channel. Use "Join Channel" first.' });
-    if (!txt) txt = vc.guild.channels.cache.filter(c => c.isTextBased()).first();
+    if (!vc) return res.json({ success: false, message: 'No voice channel found to join.' });
+
+    if (config.panelChannelId && targetGuild.channels.cache.has(config.panelChannelId)) {
+        txt = targetGuild.channels.cache.get(config.panelChannelId);
+    }
+    if (!txt) txt = targetGuild.channels.cache.filter(c => c.isTextBased()).first();
 
     try {
         const existingQueue = client.player.nodes.get(vc.guild.id);
@@ -863,26 +933,26 @@ app.post('/api/voice', async (req, res) => {
         return res.json({ success: true });
     }
 
-    if (action === 'join' && channelId) {
+    if (action === 'join') {
         if (!client.guilds) return res.json({ success: false, message: 'Bot client not connected to Discord yet.' });
-        let vc = null;
-        client.guilds.cache.forEach(g => {
-            if (g.channels.cache.has(channelId)) vc = g.channels.cache.get(channelId);
-        });
-        if (!vc) return res.json({ success: false, message: 'Voice channel not found.' });
+        const targetGuild = guildId ? client.guilds.cache.get(guildId) : client.guilds.cache.first();
+        if (!targetGuild) return res.json({ success: false, message: 'Server not found.' });
+
+        const vc = resolveTargetVoiceChannel(targetGuild, channelId);
+        if (!vc) return res.json({ success: false, message: 'No voice channel available.' });
 
         const config = getConfig();
-        config.lastVoiceChannelId = channelId;
+        config.lastVoiceChannelId = vc.id;
         saveConfig(config);
 
-        const txt = config.panelChannelId 
-            ? vc.guild.channels.cache.get(config.panelChannelId) 
-            : vc.guild.channels.cache.filter(c => c.isTextBased()).first();
+        const txt = config.panelChannelId && targetGuild.channels.cache.has(config.panelChannelId)
+            ? targetGuild.channels.cache.get(config.panelChannelId)
+            : targetGuild.channels.cache.filter(c => c.isTextBased()).first();
 
         try {
-            let queue = client.player.nodes.get(vc.guild.id);
+            let queue = client.player.nodes.get(targetGuild.id);
             if (!queue) {
-                queue = client.player.nodes.create(vc.guild, {
+                queue = client.player.nodes.create(targetGuild, {
                     metadata: { channel: txt, panelMessage: null },
                     leaveOnEmpty: false,
                     leaveOnEnd: false,
@@ -894,12 +964,23 @@ app.post('/api/voice', async (req, res) => {
                 await queue.connect(vc);
             }
             if (config.defaultVolume !== undefined) queue.node.setVolume(config.defaultVolume);
-            return res.json({ success: true });
+            return res.json({ success: true, channelName: vc.name, channelId: vc.id });
         } catch (err) {
             return res.json({ success: false, message: err.message });
         }
     }
     res.json({ success: false });
+});
+
+app.post('/api/voice/default', (req, res) => {
+    const { guildId, channelId } = req.body;
+    if (!guildId || !channelId) return res.json({ success: false, message: 'Missing parameters' });
+    const config = getConfig();
+    if (!config.defaultVoiceChannels) config.defaultVoiceChannels = {};
+    config.defaultVoiceChannels[guildId] = channelId;
+    config.defaultVoiceChannelId = channelId;
+    saveConfig(config);
+    res.json({ success: true });
 });
 
 app.get('/api/logs', (req, res) => {

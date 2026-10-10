@@ -24,13 +24,24 @@
       "url": "https://music.youtube.com/playlist?list=PLPsyW1DuhtHE&si=qtJRNnDt8oMOT1NW"
     }
   ],
-  "panelChannelId": "1557946904766058577",
-  "logChannelId": "1557946871152906370",
+  "panelChannelId": "1324978148248653834",
+  "logChannelId": "1324978148248653834",
   "logRetentionDays": 7,
   "autoHideMessages": true,
   "spotifyClientId": "6cca29b2d32c4979bbedc53703302509",
   "spotifyClientSecret": "1350816f1b6d4fbb805d6106f731195f",
-  "logLevel": "normal",
+  "logLevel": "verbose",
   "logDirectory": "C:\\Apps\\MikoDiscordMusicBot\\logs",
-  "logBackupSchedule": "daily"
+  "logBackupSchedule": "daily",
+  "lastVoiceChannelId": "1518424763784101908",
+  "history": [
+    {
+      "name": "Exoplanet",
+      "time": "04:49:40 PM"
+    }
+  ],
+  "defaultVoiceChannels": {
+    "804535377062658059": "1518424763784101908"
+  },
+  "defaultVoiceChannelId": "1518424763784101908"
 }
