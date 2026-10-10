@@ -97,41 +97,27 @@ function startBot() {
         try {
             console.log("Loading Extractor Engines...");
             
-            let tvModule;
-            try { 
-                tvModule = require('discord-player-youtubei'); 
-            } catch (e) { 
-                tvModule = await import('discord-player-youtubei'); 
-            }
+            const { DefaultExtractors, SpotifyExtractor } = require('@discord-player/extractor');
             
-            let TVClass = tvModule.YoutubeiExtractor || tvModule.YouTubeiExtractor || tvModule.default?.YoutubeiExtractor || tvModule.default?.YouTubeiExtractor;
+            // THE FIX: Import the exact key revealed by the diagnostic log
+            const { YoutubeExtractor } = require('discord-player-youtubei');
             
-            if (!TVClass) {
-                console.log("🔍 [DEBUG] Module keys found:", Object.keys(tvModule).join(', '));
-                for (const val of Object.values(tvModule)) {
-                    if (typeof val === 'function' && val.name && val.name.toLowerCase().includes('youtubei')) {
-                        TVClass = val; 
-                        break;
-                    }
-                }
+            if (YoutubeExtractor) {
+                if (!YoutubeExtractor.identifier) YoutubeExtractor.identifier = 'com.discord-player.youtubei';
+                
+                await player.extractors.register(YoutubeExtractor, {});
+                console.log(`✅ Android TV Engine Mounted Successfully!`);
+                
+                // Bridge Spotify directly to it
+                await player.extractors.register(SpotifyExtractor, { bridgeProvider: YoutubeExtractor });
+                console.log("✅ Spotify explicitly bridged to Android TV Engine");
+            } else {
+                console.error("❌ CRITICAL: YoutubeExtractor export still missing!");
             }
 
-            if (TVClass) {
-                if (!TVClass.identifier) TVClass.identifier = 'com.discord-player-youtubei';
-                await player.extractors.register(TVClass, {});
-                console.log(`✅ ${TVClass.name || 'Android TV Extractor'} Mounted!`);
-                
-                const { SpotifyExtractor, DefaultExtractors } = require('@discord-player/extractor');
-                await player.extractors.register(SpotifyExtractor, { bridgeProvider: TVClass });
-                console.log("✅ Spotify explicitly bridged to Android TV Engine");
-                
-                const remaining = DefaultExtractors.filter(ext => ext.name !== 'SpotifyExtractor');
-                await player.extractors.loadMulti(remaining);
-            } else {
-                console.log("⚠️ Could not isolate Android TV class. Falling back to safe defaults.");
-                const { DefaultExtractors } = require('@discord-player/extractor');
-                await player.extractors.loadMulti(DefaultExtractors);
-            }
+            // Load the rest of the defaults
+            const remaining = DefaultExtractors.filter(ext => ext.name !== 'SpotifyExtractor');
+            await player.extractors.loadMulti(remaining);
             
             console.log(`✅ All Extractors Active: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
         } catch (e) {
