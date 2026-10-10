@@ -20,5 +20,6 @@
     }
   ],
   "panelChannelId": "1557946904766058577",
-  "logChannelId": "1557946871152906370"
+  "logChannelId": "1557946871152906370",
+  "logRetentionDays": 7
 }

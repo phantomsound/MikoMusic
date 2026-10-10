@@ -1,194 +1,190 @@
 ﻿const express = require('express');
+const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const { QueueRepeatMode } = require('discord-player');
-const logger = require('./logger');
-const app = express();
 
-process.on('unhandledRejection', error => console.error('Unhandled Rejection:', error));
-process.on('uncaughtException', error => console.error('Uncaught Exception:', error));
-
-app.use(express.json());
-app.use(express.static('public'));
-
-function updateConfig(newValues) {
-    let config = {};
-    try { config = JSON.parse(fs.readFileSync('./config.json', 'utf-8')); } catch (e) {}
-    config = { ...config, ...newValues };
-    fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
+function getConfig() {
+    try { return JSON.parse(fs.readFileSync('./config.json', 'utf-8')); } catch (e) { return {}; }
+}
+function saveConfig(cfg) {
+    fs.writeFileSync('./config.json', JSON.stringify(cfg, null, 2));
 }
 
-function getActiveGuild(discordClient) {
-    const activeNode = discordClient.player?.nodes?.cache?.first();
-    if (activeNode) return activeNode.guild;
-    return discordClient.guilds.cache.first();
-}
-
-function startServer(discordClient) {
-    app.get('/api/config', (req, res) => {
-        try {
-            const config = JSON.parse(fs.readFileSync('./config.json', 'utf-8'));
-            res.json({ logRetentionDays: 7, ...config, clientId: process.env.CLIENT_ID });
-        } catch (e) { res.json({ logRetentionDays: 7, clientId: process.env.CLIENT_ID, savedPlaylists: [] }); }
-    });
+function startServer(client) {
+    const app = express();
+    app.use(cors());
+    app.use(express.json());
+    app.use(express.static('public'));
 
     app.get('/api/server-info', (req, res) => {
-        const guild = getActiveGuild(discordClient);
-        res.json({ serverName: guild ? guild.name : "Not Connected" });
+        res.json({ serverName: process.env.COMPUTERNAME || 'MikoHome' });
+    });
+
+    app.get('/api/config', (req, res) => {
+        const config = getConfig();
+        res.json({ 
+            dashboardName: config.dashboardName || 'Miko Music Dashboard',
+            panelChannelId: config.panelChannelId || '',
+            logChannelId: config.logChannelId || '',
+            logRetentionDays: config.logRetentionDays || 7,
+            savedPlaylists: config.savedPlaylists || [],
+            clientId: process.env.CLIENT_ID,
+            spotifyClientId: config.spotifyClientId || '',
+            spotifyClientSecret: config.spotifyClientSecret || ''
+        });
     });
 
     app.get('/api/channels', (req, res) => {
-        try {
-            const guild = getActiveGuild(discordClient);
-            if (!guild) return res.json([]);
-            res.json(guild.channels.cache.filter(c => c.isTextBased()).map(c => ({ id: c.id, name: c.name })));
-        } catch (e) { res.json([]); }
+        const channels = [];
+        client.guilds.cache.forEach(g => {
+            g.channels.cache.filter(c => c.isTextBased()).forEach(c => channels.push({ id: c.id, name: `${g.name} - ${c.name}` }));
+        });
+        res.json(channels);
     });
 
     app.get('/api/voice-channels', (req, res) => {
-        try {
-            const guild = getActiveGuild(discordClient);
-            if (!guild) return res.json([]);
-            res.json(guild.channels.cache.filter(c => c.isVoiceBased()).map(c => ({ id: c.id, name: c.name })));
-        } catch (e) { res.json([]); }
-    });
-
-    app.get('/api/queue', (req, res) => {
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        try {
-            const queue = discordClient.player?.nodes?.cache?.first();
-            if (!queue) return res.json({ current: null, tracks: [], volume: 100 });
-            res.json({
-                current: queue.currentTrack ? queue.currentTrack.title : null,
-                tracks: queue.tracks.map((t, i) => ({ index: i + 1, title: t.title })),
-                volume: queue.node.volume
-            });
-        } catch (e) { res.json({ current: null, tracks: [], volume: 100 }); }
-    });
-
-    // --- LOGGING & EXPORT APIS ---
-    app.get('/api/logs', (req, res) => {
-        res.setHeader('Cache-Control', 'no-store');
-        const logPath = logger.getLogFile();
-        if (!fs.existsSync(logPath)) return res.json({ logs: "No log entries found yet." });
-        try {
-            const content = fs.readFileSync(logPath, 'utf8');
-            const lines = content.trim().split('\n');
-            const tail = lines.slice(-100).join('\n'); // Return last 100 lines
-            res.json({ logs: tail });
-        } catch(e) {
-            res.json({ logs: `Error reading logs: ${e.message}` });
-        }
-    });
-
-    app.get('/api/logs/export', (req, res) => {
-        const logPath = logger.getLogFile();
-        if (!fs.existsSync(logPath)) return res.status(404).send("No log file found.");
-        const downloadName = `MikoMusic-Log-${new Date().toISOString().slice(0, 10)}.txt`;
-        res.download(logPath, downloadName);
+        const channels = [];
+        client.guilds.cache.forEach(g => {
+            g.channels.cache.filter(c => c.isVoiceBased()).forEach(c => channels.push({ id: c.id, name: `${g.name} - ${c.name}` }));
+        });
+        res.json(channels);
     });
 
     app.post('/api/settings', (req, res) => {
-        updateConfig(req.body);
+        const config = getConfig();
+        if (req.body.panelChannelId !== undefined) config.panelChannelId = req.body.panelChannelId;
+        if (req.body.logChannelId !== undefined) config.logChannelId = req.body.logChannelId;
+        if (req.body.logRetentionDays !== undefined) config.logRetentionDays = parseInt(req.body.logRetentionDays);
+        if (req.body.dashboardName !== undefined) config.dashboardName = req.body.dashboardName;
+        if (req.body.spotifyClientId !== undefined) config.spotifyClientId = req.body.spotifyClientId;
+        if (req.body.spotifyClientSecret !== undefined) config.spotifyClientSecret = req.body.spotifyClientSecret;
+        saveConfig(config);
         res.json({ success: true });
     });
 
     app.post('/api/playlists', (req, res) => {
-        updateConfig({ savedPlaylists: req.body.playlists });
+        const config = getConfig();
+        config.savedPlaylists = req.body.playlists || [];
+        saveConfig(config);
         res.json({ success: true });
     });
 
-    app.post('/api/voice', async (req, res) => {
-        try {
-            const { action, channelId } = req.body;
-            const guild = getActiveGuild(discordClient);
-            if (!guild) return res.json({ success: false, message: "No active Discord server found." });
-
-            if (action === 'join') {
-                if (!channelId) return res.json({ success: false, message: "Please select a Voice Channel." });
-                const queue = discordClient.player.nodes.create(guild, { 
-                    metadata: { channel: guild.channels.cache.get(channelId), panelMessage: null }, 
-                    leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false 
-                });
-                if (!queue.connection) await queue.connect(channelId);
-                return res.json({ success: true });
-            }
-            if (action === 'disconnect') {
-                const queue = discordClient.player.nodes.get(guild.id);
-                if (queue) queue.delete();
-                return res.json({ success: true });
-            }
-        } catch (e) { res.json({ success: false, message: e.message }); }
-    });
-
-    app.post('/api/volume', (req, res) => {
-        try {
-            const queue = discordClient.player?.nodes?.cache?.first();
-            if (!queue) return res.json({ success: false, message: "Nothing playing." });
-            queue.node.setVolume(Number(req.body.volume));
-            res.json({ success: true });
-        } catch (e) { res.json({ success: false, message: e.message }); }
+    app.get('/api/queue', (req, res) => {
+        const queue = client.player.nodes.cache.first();
+        if (!queue) return res.json({ current: null, tracks: [], volume: 100 });
+        const tracks = queue.tracks.toArray().map((t, i) => ({ title: t.title, author: t.author, duration: t.duration, url: t.url, index: i + 1 }));
+        res.json({ current: queue.currentTrack ? queue.currentTrack.title : null, tracks, volume: queue.node.volume });
     });
 
     app.post('/api/play', async (req, res) => {
+        let { query } = req.body;
+        if (!query) return res.json({ success: false, message: 'No query provided' });
+        
+        const config = getConfig();
+        const playlists = config.savedPlaylists || [];
+        const cleanQuery = query.toLowerCase().trim();
+        const matchedMacro = playlists.find(pl => pl.shortcode && pl.shortcode.toLowerCase() === cleanQuery);
+        
+        if (matchedMacro) query = matchedMacro.url;
+
+        let vc = null;
+        let txt = null;
+        client.guilds.cache.forEach(g => {
+            const member = g.members.cache.get(client.user.id);
+            if (member && member.voice.channel) vc = member.voice.channel;
+            if (config.panelChannelId && g.channels.cache.has(config.panelChannelId)) {
+                txt = g.channels.cache.get(config.panelChannelId);
+            }
+        });
+
+        if (!vc) return res.json({ success: false, message: 'Bot is not in a voice channel. Use the summon button first.' });
+        if (!txt) txt = vc.guild.channels.cache.filter(c => c.isTextBased()).first();
+
         try {
-            const { query } = req.body;
-            const guild = getActiveGuild(discordClient);
-            if (!guild) return res.json({ success: false, message: "No server connected." });
-
-            const queue = discordClient.player.nodes.get(guild.id);
-            const vChannel = queue?.channel;
-            if (!vChannel) return res.json({ success: false, message: "Bot is not in a voice channel. Connect via the Voice card first!" });
-
-            const config = JSON.parse(fs.readFileSync('./config.json', 'utf-8') || '{}');
-            const playlists = config.savedPlaylists || [];
-            const cleanQuery = query.toLowerCase().trim();
-            const matchedMacro = playlists.find(pl => pl.shortcode && pl.shortcode.toLowerCase() === cleanQuery);
-            let safeQuery = matchedMacro ? matchedMacro.url : query;
-            if (safeQuery.includes('music.youtube.com')) safeQuery = safeQuery.replace('music.youtube.com', 'www.youtube.com');
-
-            const { track } = await discordClient.player.play(vChannel, safeQuery, {
-                nodeOptions: {
-                    metadata: { channel: vChannel, panelMessage: queue.metadata?.panelMessage },
-                    leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false
-                }
+            const existingQueue = client.player.nodes.get(vc.guild.id);
+            const panelMsg = existingQueue && existingQueue.metadata ? existingQueue.metadata.panelMessage : null;
+            
+            await client.player.play(vc, query, {
+                nodeOptions: { metadata: { channel: txt, panelMessage: panelMsg }, leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false }
             });
-            res.json({ success: true, title: track.playlist ? track.playlist.title : track.title });
-        } catch(e) {
+            res.json({ success: true });
+        } catch (e) {
             res.json({ success: false, message: e.message });
         }
     });
 
-    app.post('/api/control', async (req, res) => {
+    app.post('/api/control', (req, res) => {
+        const queue = client.player.nodes.cache.first();
+        if (!queue) return res.json({ success: false, message: 'Nothing playing' });
+        
         try {
-            const { action, from, to } = req.body;
-            const queue = discordClient.player?.nodes?.cache?.first();
-            if (!queue) return res.json({ success: false, message: "No active music session." });
-
-            if (action === 'pause') queue.node.setPaused(!queue.node.isPaused());
-            if (action === 'skip') queue.node.skip();
-            if (action === 'stop') queue.delete();
-            if (action === 'back' && queue.history.previousTrack) await queue.history.previous();
-            if (action === 'shuffle') queue.tracks.shuffle();
-            if (action === 'loopTrack') queue.setRepeatMode(QueueRepeatMode.TRACK);
-            if (action === 'loopQueue') queue.setRepeatMode(QueueRepeatMode.QUEUE);
-            if (action === 'loopOff') queue.setRepeatMode(QueueRepeatMode.OFF);
-            if (action === 'move') {
-                const tracks = queue.tracks.toArray();
-                if (from < 1 || from > tracks.length || to < 1 || to > tracks.length) return res.json({ success: false, message: "Invalid track positions" });
-                try {
-                    queue.node.move(from - 1, to - 1);
-                } catch(e) {
-                    const track = tracks[from - 1];
-                    queue.node.remove(track);
-                    queue.node.insert(track, to - 1);
+            const act = req.body.action;
+            if (act === 'pause') queue.node.setPaused(!queue.node.isPaused());
+            else if (act === 'skip') queue.node.skip();
+            else if (act === 'stop') queue.delete();
+            else if (act === 'back' && queue.history.previousTrack) queue.history.previous();
+            else if (act === 'shuffle') queue.tracks.shuffle();
+            else if (act === 'loopTrack') queue.setRepeatMode(QueueRepeatMode.TRACK);
+            else if (act === 'loopQueue') queue.setRepeatMode(QueueRepeatMode.QUEUE);
+            else if (act === 'loopOff') queue.setRepeatMode(QueueRepeatMode.OFF);
+            else if (act === 'move') {
+                const { from, to } = req.body;
+                try { queue.node.move(from, to); } catch(e) {
+                    const tracks = queue.tracks.toArray();
+                    const t = tracks[from];
+                    queue.node.remove(t);
+                    queue.node.insert(t, to);
                 }
             }
             res.json({ success: true });
-        } catch (e) { res.json({ success: false, message: e.message }); }
+        } catch(e) { res.json({ success: false, message: e.message }); }
     });
 
-    const port = process.env.PORT || 3000;
-    app.listen(port, () => console.log(`🌐 Web UI running on port ${port}`));
+    app.post('/api/volume', (req, res) => {
+        const queue = client.player.nodes.cache.first();
+        if (queue && req.body.volume !== undefined) queue.node.setVolume(parseInt(req.body.volume));
+        res.json({ success: true });
+    });
+
+    app.post('/api/voice', async (req, res) => {
+        const { action, channelId } = req.body;
+        if (action === 'disconnect') {
+            const queue = client.player.nodes.cache.first();
+            if (queue) queue.delete();
+            return res.json({ success: true });
+        }
+        if (action === 'join' && channelId) {
+            let vc = null;
+            client.guilds.cache.forEach(g => { if (g.channels.cache.has(channelId)) vc = g.channels.cache.get(channelId); });
+            if (!vc) return res.json({ success: false, message: 'Voice channel not found.' });
+            
+            const config = getConfig();
+            const txt = config.panelChannelId ? vc.guild.channels.cache.get(config.panelChannelId) : vc.guild.channels.cache.filter(c=>c.isTextBased()).first();
+            
+            const queue = client.player.nodes.create(vc.guild, { metadata: { channel: txt, panelMessage: null }, leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false });
+            await queue.connect(vc);
+            return res.json({ success: true });
+        }
+        res.json({ success: false });
+    });
+
+    app.get('/api/logs', (req, res) => {
+        const logPath = path.join(__dirname, 'logs', 'bot.log');
+        if (fs.existsSync(logPath)) {
+            const logs = fs.readFileSync(logPath, 'utf-8').split('\n').slice(-50).join('\n');
+            res.json({ logs });
+        } else { res.json({ logs: '' }); }
+    });
+
+    app.get('/api/logs/export', (req, res) => {
+        const logPath = path.join(__dirname, 'logs', 'bot.log');
+        if (fs.existsSync(logPath)) res.download(logPath);
+        else res.status(404).send('Log file not found.');
+    });
+
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => console.log(`🌐 Web UI running on port ${PORT}`));
 }
+
 module.exports = { startServer };

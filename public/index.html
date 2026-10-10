@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Miko Music - Admin</title>
     <style>
-        :root { 
-            --bg: #1e1e2e; --card: #282a36; --card-alt: #313244; 
-            --input: #181825; --border: #45475a; --text: #cdd6f4; 
-            --blue: #89b4fa; --green: #a6e3a1; --red: #f38ba8; --yellow: #f9e2af; 
+        :root {
+            --bg: #1e1e2e; --card: #282a36; --card-alt: #313244;
+            --input: #181825; --border: #45475a; --text: #cdd6f4;
+            --blue: #89b4fa; --green: #a6e3a1; --red: #f38ba8; --yellow: #f9e2af;
         }
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; max-width: 1040px; margin: 0 auto; line-height: 1.4; }
@@ -23,7 +23,7 @@
         button:hover { filter: brightness(1.15); }
         .btn-success { background: var(--green); } .btn-danger { background: var(--red); color: #11111b; } .btn-warning { background: var(--yellow); } .btn-secondary { background: var(--card-alt); color: var(--text); border: 1px solid var(--border); }
         .help-text { font-size: 0.82rem; color: #a6adc8; margin-bottom: 0.8rem; display: block; }
-        
+
         .overrides-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 1rem; }
         @media (max-width: 700px) { .overrides-grid { grid-template-columns: repeat(2, 1fr); } }
         .overrides-grid button { width: 100%; padding: 0.75rem; }
@@ -55,7 +55,7 @@
         </div>
         <button class="btn-success" onclick="openDiscordInvite()">➕ Invite Bot to Server</button>
     </div>
-    
+
     <div class="card full" style="border-left: 4px solid var(--blue);">
         <h3>📡 Remote Voice Connection</h3>
         <span class="help-text">Instantly summon or disconnect the bot from voice channels without touching Discord.</span>
@@ -67,7 +67,7 @@
             <button onclick="manageVoice('disconnect')" class="btn-danger">🔇 Disconnect</button>
         </div>
     </div>
-    
+
     <div class="card full" style="border-left: 4px solid var(--yellow);">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
             <h3 style="margin: 0;">Live Audio Overrides & Controls</h3>
@@ -102,22 +102,46 @@
         <div class="card" style="margin-bottom: 0;">
             <h3>Live Queue Management</h3>
             <span class="help-text">Drag items by handle ☰ to reorder, or use manual inputs.</span>
-            
+
             <div style="display: flex; gap: 8px; margin-bottom: 0.8rem;">
                 <input type="text" id="remotePlayInput" placeholder="Queue track URL or shortcode (e.g., fng)..." style="flex: 1;">
                 <button class="btn-success" onclick="remotePlay()">▶️ Play</button>
             </div>
 
             <div id="activeNowPlaying" style="color: var(--green); font-weight: bold; margin-bottom: 0.4rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">▶️ Nothing Playing</div>
-            
+
             <div class="queue-container" id="queueContainer"></div>
-            
+
             <div class="move-box">
                 <span style="font-size:0.88rem;">Move #</span>
                 <input type="number" id="moveFrom" min="1">
                 <span style="font-size:0.88rem;">to #</span>
                 <input type="number" id="moveTo" min="1">
                 <button onclick="manualMoveTrack()" class="btn-success" style="padding: 0.65rem 1rem;">Move</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- API CREDENTIALS & MACROS -->
+    <div class="card full" style="margin-top: 1.5rem; border-left: 4px solid var(--blue);">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+            <div>
+                <h3>Spotify API Authentication</h3>
+                <span class="help-text">If left blank, the bot will use anonymous web scraping (which Spotify frequently blocks). Enter a valid Client ID and Secret to securely authenticate playlist scrapes. Note: The bot will need to be restarted to load these credentials.</span>
+                <label style="display:block; margin-top:8px; font-weight:600; font-size:0.88rem;">Client ID:</label>
+                <input type="text" id="spotifyClientId" placeholder="e.g. 8a2b3c4d5e6f7g8h9i0j1k2l">
+                <label style="display:block; margin-top:12px; font-weight:600; font-size:0.88rem;">Client Secret:</label>
+                <input type="password" id="spotifyClientSecret" placeholder="••••••••••••••••••••••••">
+                <button onclick="saveSpotifyKeys()" style="margin-top: 1rem; width: 100%;">🔑 Save API Keys</button>
+            </div>
+            <div>
+                <h3>Playlist Manager & Hot-Load Macros</h3>
+                <span class="help-text">Assign a shortcode (e.g., <code>fng</code>) to instantly queue the target Spotify or YouTube playlist.</span>
+                <div id="plContainer" style="max-height: 200px; overflow-y: auto;"></div>
+                <div style="margin-top: 1rem; display: flex; gap: 10px;">
+                    <button onclick="addEmptyPlaylistRow()" class="btn-success">+ Add Row</button>
+                    <button onclick="savePlaylists()">💾 Save Playlists</button>
+                </div>
             </div>
         </div>
     </div>
@@ -150,17 +174,7 @@
             <button onclick="saveLogRetention()" class="btn-success" style="padding: 0.65rem 1rem;">💾 Save Retention</button>
         </div>
     </div>
-    
-    <div class="card full" style="margin-top: 1.5rem;">
-        <h3>Playlist Manager & Hot-Load Macros</h3>
-        <span class="help-text">Assign a shortcode (e.g., <code>fng</code>) to instantly queue the target Spotify or YouTube playlist.</span>
-        <div id="plContainer"></div>
-        <div style="margin-top: 1rem; display: flex; gap: 10px;">
-            <button onclick="addEmptyPlaylistRow()" class="btn-success">+ Add Row</button>
-            <button onclick="savePlaylists()">💾 Save All Playlists</button>
-        </div>
-    </div>
-    
+
     <script>
         let cachedPlaylists = [];
         let isFirstLoad = true;
@@ -184,17 +198,19 @@
                     panel.innerHTML += `<option value="${c.id}">#${c.name}</option>`;
                     log.innerHTML += `<option value="${c.id}">#${c.name}</option>`;
                 });
-                
+
                 fetch('/api/config').then(r => r.json()).then(data => {
                     if (data.dashboardName) document.getElementById('dashTitle').innerText = data.dashboardName;
                     if (data.panelChannelId) panel.value = data.panelChannelId;
                     if (data.logChannelId) log.value = data.logChannelId;
                     if (data.logRetentionDays) document.getElementById('logRetentionDays').value = data.logRetentionDays;
+                    if (data.spotifyClientId) document.getElementById('spotifyClientId').value = data.spotifyClientId;
+                    if (data.spotifyClientSecret) document.getElementById('spotifyClientSecret').value = data.spotifyClientSecret;
                     cachedPlaylists = data.savedPlaylists || [];
                     renderPlaylists();
                 });
             });
-            
+
             fetch('/api/voice-channels').then(r => r.json()).then(channels => {
                 const vcSelect = document.getElementById('voiceChannelSelect');
                 vcSelect.innerHTML = '<option value="">-- Select Voice Channel --</option>';
@@ -222,12 +238,24 @@
                 body: JSON.stringify({ logRetentionDays: days })
             }).then(() => alert(`Log retention set to ${days} days!`));
         }
+        
+        function saveSpotifyKeys() {
+            const spotifyClientId = document.getElementById('spotifyClientId').value.trim();
+            const spotifyClientSecret = document.getElementById('spotifyClientSecret').value.trim();
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ spotifyClientId, spotifyClientSecret })
+            }).then(() => {
+                alert('Spotify API credentials saved. The bot must be restarted to lock them into the Extractor pipeline.');
+            });
+        }
 
         function refreshQueue() {
             fetch('/api/queue').then(r => r.json()).then(data => {
                 document.getElementById('activeNowPlaying').innerText = data.current ? `▶️ Now Playing: ${data.current}` : '▶️ Nothing Playing';
                 const qc = document.getElementById('queueContainer');
-                
+
                 if (!data.tracks || !data.tracks.length) {
                     qc.innerHTML = '<div style="color:#6c7086; padding:0.5rem; font-size:0.9rem;">Queue is empty.</div>';
                 } else {
@@ -240,7 +268,7 @@
                     `).join('');
                     bindDragEvents();
                 }
-                
+
                 if (isFirstLoad && data.volume !== undefined) {
                     document.getElementById('volSlider').value = data.volume;
                     document.getElementById('volLabel').innerText = data.volume;
@@ -273,10 +301,10 @@
         }
 
         function moveTrackApi(from, to) {
-            fetch('/api/control', { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ action: 'move', from, to }) 
+            fetch('/api/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'move', from, to })
             }).then(() => refreshQueue());
         }
 
@@ -290,7 +318,7 @@
         }
 
         setInterval(refreshQueue, 3500);
-        setInterval(fetchLogs, 5000); // Live poll logs every 5s
+        setInterval(fetchLogs, 5000);
 
         function editDashName() {
             const newName = prompt("Enter new dashboard name:", document.getElementById('dashTitle').innerText);
@@ -341,7 +369,7 @@
                     <div class="pl-item">
                         <input type="text" value="${pl.name || ''}" id="pl-name-${index}" placeholder="Playlist Name" oninput="syncPlaylistsFromDOM()">
                         <input type="text" value="${pl.shortcode || ''}" id="pl-code-${index}" placeholder="Shortcode" oninput="syncPlaylistsFromDOM()">
-                        <input type="text" value="${pl.url || ''}" id="pl-url-${index}" placeholder="Spotify or YouTube URL" oninput="syncPlaylistsFromDOM()">
+                        <input type="text" value="${pl.url || ''}" id="pl-url-${index}" placeholder="URL" oninput="syncPlaylistsFromDOM()">
                         <button class="btn-danger" onclick="removePlaylistRow(${index})">✕</button>
                     </div>
                 `;
@@ -361,7 +389,7 @@
                 if (n && u) newPlaylists.push({ name: n, shortcode: c, url: u });
             }
             fetch('/api/playlists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playlists: newPlaylists }) })
-            .then(() => { alert('Playlists and shortcodes saved successfully!'); loadConfig(); });
+            .then(() => { alert('Playlists saved successfully!'); loadConfig(); });
         }
 
         function updateChannels() {
@@ -372,7 +400,7 @@
         function openDiscordInvite() {
             fetch('/api/config').then(r => r.json()).then(data => {
                 const id = data.clientId || prompt("Paste your Application ID:");
-                if (!id) return; 
+                if (!id) return;
                 window.open(`https://discord.com/oauth2/authorize?client_id=${id}&permissions=3148800&scope=bot%20applications.commands`, 'popup', 'width=500,height=750');
             });
         }
