@@ -12,17 +12,14 @@
         }
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; max-width: 1040px; margin: 0 auto; line-height: 1.4; }
-        
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
         
-        /* TABS CSS */
         .tab-nav { display: flex; gap: 10px; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
         .tab-btn { background: transparent; color: var(--text); border: none; padding: 0.6rem 1.2rem; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1.05rem; opacity: 0.6; transition: 0.2s; }
         .tab-btn:hover { opacity: 1; background: var(--card); }
         .tab-btn.active { opacity: 1; background: var(--blue); color: #11111b; }
-        .tab-content { display: none; animation: fadeIn 0.3s; }
+        .tab-content { display: none; }
         .tab-content.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
         .grid-layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; }
         .card { background: var(--card); padding: 1.4rem; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.15); margin-bottom: 1.5rem; }
@@ -43,7 +40,7 @@
         .pl-item button { padding: 0.65rem; }
 
         .queue-container { max-height: 220px; overflow-y: auto; background: var(--input); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; margin-top: 0.5rem; }
-        .queue-item { display: flex; align-items: center; gap: 10px; padding: 0.55rem 0.75rem; background: var(--card); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 6px; cursor: grab; user-select: none; transition: background 0.15s, transform 0.15s; }
+        .queue-item { display: flex; align-items: center; gap: 10px; padding: 0.55rem 0.75rem; background: var(--card); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 6px; cursor: grab; user-select: none; transition: background 0.15s; }
         .queue-item:hover { background: var(--card-alt); }
         .queue-item.dragging { opacity: 0.4; transform: scale(0.98); }
         .drag-handle { color: #6c7086; cursor: grab; font-size: 1.1rem; }
@@ -52,7 +49,11 @@
         .move-box { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.8rem; background: var(--input); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border); }
         .move-box input { width: 75px; text-align: center; }
 
-        .terminal-box { background: #11111b; border: 1px solid var(--border); border-radius: 6px; padding: 0.8rem; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.82rem; height: 250px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #a6e3a1; margin-top: 0.6rem; }
+        .terminal-box { background: #11111b; border: 1px solid var(--border); border-radius: 6px; padding: 0.8rem; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.82rem; height: 230px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #a6e3a1; margin-top: 0.6rem; }
+        
+        .accordion-header { background: var(--input); padding: 0.8rem 1rem; border-radius: 6px; cursor: pointer; border: 1px solid var(--border); margin-top: 0.5rem; display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 0.95rem; }
+        .accordion-body { display: none; background: #181825; padding: 1rem; border: 1px solid var(--border); border-top: none; border-radius: 0 0 6px 6px; font-size: 0.88rem; color: #bac2de; line-height: 1.5; }
+        .accordion-body.open { display: block; }
     </style>
 </head>
 <body>
@@ -67,13 +68,12 @@
         <button class="btn-success" onclick="openDiscordInvite()">➕ Invite Bot to Server</button>
     </div>
 
-    <!-- TAB NAVIGATION -->
     <div class="tab-nav">
         <button class="tab-btn active" onclick="switchTab('main')">🎧 Main Dashboard</button>
         <button class="tab-btn" onclick="switchTab('tools')">⚙️ System Tools</button>
     </div>
 
-    <!-- TAB: MAIN DASHBOARD -->
+    <!-- MAIN DASHBOARD -->
     <div id="tab-main" class="tab-content active">
         <div class="card full" style="border-left: 4px solid var(--blue);">
             <h3>📡 Remote Voice Connection</h3>
@@ -139,12 +139,12 @@
         </div>
     </div>
 
-    <!-- TAB: SYSTEM TOOLS -->
+    <!-- SYSTEM TOOLS -->
     <div id="tab-tools" class="tab-content">
         <div class="grid-layout">
             <div class="card">
                 <h3>Spotify API Authentication</h3>
-                <span class="help-text">Enter a valid Client ID and Secret to securely authenticate playlist scrapes. Note: The bot will need to be restarted to lock these in.</span>
+                <span class="help-text">Enter Client ID and Secret to authenticate playlist scrapes. Restart bot to apply changes.</span>
                 <label style="display:block; margin-top:8px; font-weight:600; font-size:0.88rem;">Client ID:</label>
                 <input type="text" id="spotifyClientId" placeholder="e.g. 8a2b3c4d5e6f7g8h9i0j1k2l">
                 <label style="display:block; margin-top:12px; font-weight:600; font-size:0.88rem;">Client Secret:</label>
@@ -154,46 +154,100 @@
 
             <div class="card">
                 <h3>Discord Channel Routing</h3>
-                <span class="help-text">Configure where control panels and automated logs should be sent.</span>
-                <label style="display:block; margin-top:8px; font-weight:600; font-size:0.88rem;">Dedicated Command / Panel Channel:</label>
-                <select id="panelChannelId"><option value="">-- No Restriction (Anywhere) --</option></select>
-                <label style="display:block; margin-top:12px; font-weight:600; font-size:0.88rem;">Notification Log Channel (Now Playing):</label>
+                <span class="help-text">Configure where control panels and automated logs are posted.</span>
+                <label style="display:block; margin-top:8px; font-weight:600; font-size:0.88rem;">Command / Panel Channel:</label>
+                <select id="panelChannelId"><option value="">-- No Restriction --</option></select>
+                <label style="display:block; margin-top:12px; font-weight:600; font-size:0.88rem;">Notification Log Channel:</label>
                 <select id="logChannelId"><option value="">-- Do Not Send Logs --</option></select>
                 
                 <label style="display:flex; align-items:center; gap: 8px; margin-top:15px; font-size:0.9rem; cursor:pointer;">
                     <input type="checkbox" id="autoHideMessages" style="width:18px; height:18px; accent-color: var(--blue);">
-                    <b>Auto-Hide Discord Messages</b> (Delete 'Now Playing' logs after 60 seconds)
+                    <b>Auto-Hide Discord Messages</b> (Delete 'Now Playing' logs after 60s)
                 </label>
-
                 <button onclick="saveToolsConfig()" class="btn-success" style="margin-top: 1rem; width: 100%;">💾 Save UI Routing</button>
             </div>
         </div>
 
+        <!-- LOG & SYSTEM CONTROLS -->
         <div class="card full" style="border-left: 4px solid var(--green);">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem;">
                 <div>
-                    <h3 style="margin: 0;">🖥️ System Diagnostics & Log Management</h3>
-                    <span class="help-text" style="margin: 0;">Auto-rotates and archives logs. Defers rotation while bot is actively in a voice channel.</span>
+                    <h3 style="margin: 0;">🖥️ Diagnostics, Retention & Logging</h3>
+                    <span class="help-text" style="margin: 0;">Configure log destinations, retention intervals, and process controls.</span>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <button onclick="window.open('/api/logs/export')" class="btn-secondary">📥 Export (.txt)</button>
                     <button onclick="fetchLogs()" class="btn-secondary">🔄 Refresh</button>
+                    <button onclick="restartService()" class="btn-danger">⚠️ Restart Service</button>
                 </div>
             </div>
 
             <div class="terminal-box" id="terminalBox">Loading service logs...</div>
 
-            <div style="display: flex; gap: 15px; margin-top: 1rem; align-items: center; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <label style="font-size: 0.88rem; font-weight: 600;">Log Retention:</label>
-                    <select id="logRetentionDays" style="width: 140px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 1rem; align-items: end;">
+                <div>
+                    <label style="font-size: 0.85rem; font-weight: 600;">Log Retention:</label>
+                    <select id="logRetentionDays">
                         <option value="3">3 Days</option>
                         <option value="7">7 Days (Default)</option>
                         <option value="14">14 Days</option>
                         <option value="30">30 Days</option>
                     </select>
                 </div>
-                <button onclick="saveToolsConfig()" class="btn-success" style="padding: 0.65rem 1rem;">💾 Save Retention</button>
+                <div>
+                    <label style="font-size: 0.85rem; font-weight: 600;">Log Verbosity:</label>
+                    <select id="logLevel">
+                        <option value="normal">Normal (Info / Errors)</option>
+                        <option value="debug">Debug (Extractor & Bridge)</option>
+                        <option value="verbose">Verbose (Full Tracing)</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.85rem; font-weight: 600;">Backup Schedule:</label>
+                    <select id="logBackupSchedule">
+                        <option value="daily">Daily at Midnight</option>
+                        <option value="12h">Every 12 Hours</option>
+                        <option value="on_empty">On Queue Empty</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.85rem; font-weight: 600;">Log Directory Path:</label>
+                    <input type="text" id="logDirectory" placeholder="C:\Apps\MikoDiscordMusicBot\logs">
+                </div>
+            </div>
+            <button onclick="saveToolsConfig()" class="btn-success" style="margin-top: 1rem;">💾 Save Diagnostic Settings</button>
+        </div>
+
+        <!-- QUICK HOW-TO GUIDE -->
+        <div class="card full" style="border-left: 4px solid var(--blue);">
+            <h3>📖 Miko Music Quick-Start Guide</h3>
+            <span class="help-text">Click a section below for quick reference instructions.</span>
+
+            <div class="accordion-header" onclick="toggleAccordion('guide-macros')">
+                <span>1. Playlist Macros & Hot-Loading</span><span>▼</span>
+            </div>
+            <div id="guide-macros" class="accordion-body">
+                • <b>Assign Shortcodes:</b> In the Playlist Manager, add a clean name, a memorable shortcode (e.g., <code>fng</code> or <code>dtg</code>), and the playlist URL.<br>
+                • <b>Instant Queue:</b> Type just the shortcode in the Remote Play input or Discord <code>🔍 Add Song</code> modal to load all tracks.<br>
+                • <b>Source of Truth:</b> Playlists update live from Spotify or YouTube each time they are queued.
+            </div>
+
+            <div class="accordion-header" onclick="toggleAccordion('guide-queue')">
+                <span>2. Live Queue & Reordering</span><span>▼</span>
+            </div>
+            <div id="guide-queue" class="accordion-body">
+                • <b>Drag & Drop:</b> Use the ☰ handle on any track to drag it up or down in the queue.<br>
+                • <b>Manual Move:</b> Type track # and destination # into the move boxes and click <b>Move</b>.<br>
+                • <b>Non-Destructive Stop:</b> Clicking <b>Clear Queue</b> halts playback and clears upcoming tracks without dropping the bot from the voice channel.
+            </div>
+
+            <div class="accordion-header" onclick="toggleAccordion('guide-channels')">
+                <span>3. Standby Banner & Channel Routing</span><span>▼</span>
+            </div>
+            <div id="guide-channels" class="accordion-body">
+                • <b>Dedicated Channel:</b> Lock control panels to a specific Discord channel in Channel Routing.<br>
+                • <b>Persistent Banner:</b> When queue finishes or disconnects, the summon banner regenerates at the bottom of the chat.<br>
+                • <b>Auto-Hide:</b> Check <b>Auto-Hide Discord Messages</b> to automatically purge Now Playing cards after 60s.
             </div>
         </div>
     </div>
@@ -204,12 +258,18 @@
         let draggedIndex = null;
         let isMuted = false;
         let preMuteVol = 100;
+        let currentQueueState = { current: null, tracks: [] };
 
         function switchTab(tabId) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             document.querySelector(`.tab-btn[onclick="switchTab('${tabId}')"]`).classList.add('active');
             document.getElementById(`tab-${tabId}`).classList.add('active');
+        }
+
+        function toggleAccordion(id) {
+            const body = document.getElementById(id);
+            body.classList.toggle('open');
         }
 
         function escapeHTML(str) { return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag])); }
@@ -234,6 +294,9 @@
                     if (data.panelChannelId) panel.value = data.panelChannelId;
                     if (data.logChannelId) log.value = data.logChannelId;
                     if (data.logRetentionDays) document.getElementById('logRetentionDays').value = data.logRetentionDays;
+                    if (data.logLevel) document.getElementById('logLevel').value = data.logLevel;
+                    if (data.logDirectory) document.getElementById('logDirectory').value = data.logDirectory;
+                    if (data.logBackupSchedule) document.getElementById('logBackupSchedule').value = data.logBackupSchedule;
                     if (data.autoHideMessages) document.getElementById('autoHideMessages').checked = true;
                     if (data.spotifyClientId) document.getElementById('spotifyClientId').value = data.spotifyClientId;
                     if (data.spotifyClientSecret) document.getElementById('spotifyClientSecret').value = data.spotifyClientSecret;
@@ -265,6 +328,9 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     logRetentionDays: parseInt(document.getElementById('logRetentionDays').value),
+                    logLevel: document.getElementById('logLevel').value,
+                    logDirectory: document.getElementById('logDirectory').value.trim(),
+                    logBackupSchedule: document.getElementById('logBackupSchedule').value,
                     spotifyClientId: document.getElementById('spotifyClientId').value.trim(),
                     spotifyClientSecret: document.getElementById('spotifyClientSecret').value.trim(),
                     panelChannelId: document.getElementById('panelChannelId').value,
@@ -274,8 +340,17 @@
             }).then(() => alert(`Tool settings saved successfully!`));
         }
 
+        function restartService() {
+            if (confirm("Restart the Miko Music Bot Windows Service now? Audio will disconnect for 5-10 seconds.")) {
+                fetch('/api/system/restart', { method: 'POST' }).then(() => {
+                    alert('Restart command issued. The dashboard will reconnect shortly.');
+                });
+            }
+        }
+
         function refreshQueue() {
             fetch('/api/queue').then(r => r.json()).then(data => {
+                currentQueueState = data;
                 document.getElementById('activeNowPlaying').innerText = data.current ? `▶️ Now Playing: ${data.current}` : '▶️ Nothing Playing';
                 const qc = document.getElementById('queueContainer');
 
@@ -357,7 +432,7 @@
                 document.getElementById('muteToggleBtn').innerText = '🔊';
             } else {
                 isMuted = true;
-                preMuteVol = slider.value == 0 ? 100 : slider.value; // Save volume before mute, default to 100 if dragging from 0
+                preMuteVol = slider.value == 0 ? 100 : slider.value;
                 slider.value = 0;
                 document.getElementById('muteToggleBtn').innerText = '🔇';
             }
@@ -372,9 +447,23 @@
             fetch('/api/volume', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ volume: vol }) });
         }
 
-        function remotePlay() {
-            const query = document.getElementById('remotePlayInput').value;
+        async function remotePlay() {
+            const query = document.getElementById('remotePlayInput').value.trim();
             if (!query) return;
+
+            // Detect if loading a playlist or macro
+            const cleanQuery = query.toLowerCase();
+            const isMacro = cachedPlaylists.some(pl => pl.shortcode && pl.shortcode.toLowerCase() === cleanQuery);
+            const isPlaylistUrl = query.includes('playlist') || query.includes('list=') || query.includes('/album/');
+
+            if ((isMacro || isPlaylistUrl) && (currentQueueState.current || currentQueueState.tracks.length > 0)) {
+                const choice = confirm("⚠️ Music is currently active!\n\nLoading a full playlist on top will append it. Click OK to clear the current queue first, or Cancel to abort.");
+                if (!choice) return;
+                
+                await fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop' }) });
+                await new Promise(r => setTimeout(r, 400));
+            }
+
             fetch('/api/play', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) })
             .then(r => r.json()).then(res => {
                 if (!res.success) alert(res.message);
