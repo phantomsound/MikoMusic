@@ -26,6 +26,7 @@ function startServer(client) {
             panelChannelId: config.panelChannelId || '',
             logChannelId: config.logChannelId || '',
             logRetentionDays: config.logRetentionDays || 7,
+            autoHideMessages: config.autoHideMessages || false,
             savedPlaylists: config.savedPlaylists || [],
             clientId: process.env.CLIENT_ID,
             spotifyClientId: config.spotifyClientId || '',
@@ -54,6 +55,7 @@ function startServer(client) {
         if (req.body.panelChannelId !== undefined) config.panelChannelId = req.body.panelChannelId;
         if (req.body.logChannelId !== undefined) config.logChannelId = req.body.logChannelId;
         if (req.body.logRetentionDays !== undefined) config.logRetentionDays = parseInt(req.body.logRetentionDays);
+        if (req.body.autoHideMessages !== undefined) config.autoHideMessages = req.body.autoHideMessages;
         if (req.body.dashboardName !== undefined) config.dashboardName = req.body.dashboardName;
         if (req.body.spotifyClientId !== undefined) config.spotifyClientId = req.body.spotifyClientId;
         if (req.body.spotifyClientSecret !== undefined) config.spotifyClientSecret = req.body.spotifyClientSecret;

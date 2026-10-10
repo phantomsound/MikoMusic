@@ -12,7 +12,18 @@
         }
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; max-width: 1040px; margin: 0 auto; line-height: 1.4; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
+        
+        /* TABS CSS */
+        .tab-nav { display: flex; gap: 10px; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
+        .tab-btn { background: transparent; color: var(--text); border: none; padding: 0.6rem 1.2rem; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1.05rem; opacity: 0.6; transition: 0.2s; }
+        .tab-btn:hover { opacity: 1; background: var(--card); }
+        .tab-btn.active { opacity: 1; background: var(--blue); color: #11111b; }
+        .tab-content { display: none; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
         .grid-layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; }
         .card { background: var(--card); padding: 1.4rem; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.15); margin-bottom: 1.5rem; }
         .card.full { width: 100%; margin-bottom: 1.5rem; }
@@ -41,7 +52,7 @@
         .move-box { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.8rem; background: var(--input); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border); }
         .move-box input { width: 75px; text-align: center; }
 
-        .terminal-box { background: #11111b; border: 1px solid var(--border); border-radius: 6px; padding: 0.8rem; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.82rem; height: 180px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #a6e3a1; margin-top: 0.6rem; }
+        .terminal-box { background: #11111b; border: 1px solid var(--border); border-radius: 6px; padding: 0.8rem; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.82rem; height: 250px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #a6e3a1; margin-top: 0.6rem; }
     </style>
 </head>
 <body>
@@ -56,122 +67,134 @@
         <button class="btn-success" onclick="openDiscordInvite()">➕ Invite Bot to Server</button>
     </div>
 
-    <div class="card full" style="border-left: 4px solid var(--blue);">
-        <h3>📡 Remote Voice Connection</h3>
-        <span class="help-text">Instantly summon or disconnect the bot from voice channels without touching Discord.</span>
-        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <select id="voiceChannelSelect" style="max-width: 320px;">
-                <option value="">-- Select Voice Channel --</option>
-            </select>
-            <button onclick="manageVoice('join')" class="btn-success">🔊 Join Channel</button>
-            <button onclick="manageVoice('disconnect')" class="btn-danger">🔇 Disconnect</button>
-        </div>
+    <!-- TAB NAVIGATION -->
+    <div class="tab-nav">
+        <button class="tab-btn active" onclick="switchTab('main')">🎧 Main Dashboard</button>
+        <button class="tab-btn" onclick="switchTab('tools')">⚙️ System Tools</button>
     </div>
 
-    <div class="card full" style="border-left: 4px solid var(--yellow);">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-            <h3 style="margin: 0;">Live Audio Overrides & Controls</h3>
-            <div style="display: flex; align-items: center; gap: 10px; background: var(--input); padding: 0.4rem 0.9rem; border-radius: 20px; border: 1px solid var(--border);">
-                <span>🔊 Volume: <b id="volLabel">100</b>%</span>
-                <input type="range" id="volSlider" min="0" max="200" value="100" onchange="setVolume()" style="width: 140px; cursor: pointer;">
+    <!-- TAB: MAIN DASHBOARD -->
+    <div id="tab-main" class="tab-content active">
+        <div class="card full" style="border-left: 4px solid var(--blue);">
+            <h3>📡 Remote Voice Connection</h3>
+            <span class="help-text">Instantly summon or disconnect the bot from voice channels without touching Discord.</span>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <select id="voiceChannelSelect" style="max-width: 320px;">
+                    <option value="">-- Select Voice Channel --</option>
+                </select>
+                <button onclick="manageVoice('join')" class="btn-success">🔊 Join Channel</button>
+                <button onclick="manageVoice('disconnect')" class="btn-danger">🔇 Disconnect</button>
             </div>
         </div>
-        <div class="overrides-grid">
-            <button onclick="controlPlayer('back')">⏮️ Back</button>
-            <button onclick="controlPlayer('pause')">⏯️ Play / Pause</button>
-            <button onclick="controlPlayer('skip')">⏭️ Skip</button>
-            <button onclick="controlPlayer('shuffle')" class="btn-warning">🔀 Shuffle</button>
-            <button onclick="controlPlayer('loopTrack')" class="btn-success">🔂 Loop Track</button>
-            <button onclick="controlPlayer('loopQueue')" class="btn-success">🔁 Loop Queue</button>
-            <button onclick="controlPlayer('loopOff')" class="btn-danger">❌ Loop Off</button>
-            <button onclick="controlPlayer('stop')" class="btn-danger">⏹️ Clear Queue</button>
-        </div>
-    </div>
 
-    <div class="grid-layout">
-        <div class="card" style="margin-bottom: 0;">
-            <h3>Discord Channel Routing</h3>
-            <span class="help-text">Configure dedicated panel display and notification log targets.</span>
-            <label style="display:block; margin-top:8px; font-weight:600; font-size:0.88rem;">Dedicated Command / Panel Channel:</label>
-            <select id="panelChannelId"><option value="">-- No Restriction (Anywhere) --</option></select>
-            <label style="display:block; margin-top:12px; font-weight:600; font-size:0.88rem;">Notification Log Channel (Now Playing):</label>
-            <select id="logChannelId"><option value="">-- Do Not Send Logs --</option></select>
-            <button onclick="updateChannels()" style="margin-top: 1rem; width: 100%;">💾 Save Channel Routing</button>
-        </div>
-
-        <div class="card" style="margin-bottom: 0;">
-            <h3>Live Queue Management</h3>
-            <span class="help-text">Drag items by handle ☰ to reorder, or use manual inputs.</span>
-
-            <div style="display: flex; gap: 8px; margin-bottom: 0.8rem;">
-                <input type="text" id="remotePlayInput" placeholder="Queue track URL or shortcode (e.g., fng)..." style="flex: 1;">
-                <button class="btn-success" onclick="remotePlay()">▶️ Play</button>
+        <div class="card full" style="border-left: 4px solid var(--yellow);">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                <h3 style="margin: 0;">Live Audio Overrides & Controls</h3>
+                <div style="display: flex; align-items: center; gap: 10px; background: var(--input); padding: 0.4rem 0.9rem; border-radius: 20px; border: 1px solid var(--border);">
+                    <span>Volume: <b id="volLabel">100</b>%</span>
+                    <button id="muteToggleBtn" onclick="toggleMute()" style="padding: 0; background: transparent; border: none; font-size: 1.2rem; cursor: pointer;">🔊</button>
+                    <input type="range" id="volSlider" min="0" max="200" value="100" onchange="setVolume()" style="width: 140px; cursor: pointer;">
+                </div>
             </div>
-
-            <div id="activeNowPlaying" style="color: var(--green); font-weight: bold; margin-bottom: 0.4rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">▶️ Nothing Playing</div>
-
-            <div class="queue-container" id="queueContainer"></div>
-
-            <div class="move-box">
-                <span style="font-size:0.88rem;">Move #</span>
-                <input type="number" id="moveFrom" min="1">
-                <span style="font-size:0.88rem;">to #</span>
-                <input type="number" id="moveTo" min="1">
-                <button onclick="manualMoveTrack()" class="btn-success" style="padding: 0.65rem 1rem;">Move</button>
+            <div class="overrides-grid">
+                <button onclick="controlPlayer('back')">⏮️ Back</button>
+                <button onclick="controlPlayer('pause')">⏯️ Play / Pause</button>
+                <button onclick="controlPlayer('skip')">⏭️ Skip</button>
+                <button onclick="controlPlayer('shuffle')" class="btn-warning">🔀 Shuffle</button>
+                <button onclick="controlPlayer('loopTrack')" class="btn-success">🔂 Loop Track</button>
+                <button onclick="controlPlayer('loopQueue')" class="btn-success">🔁 Loop Queue</button>
+                <button onclick="controlPlayer('loopOff')" class="btn-danger">❌ Loop Off</button>
+                <button onclick="controlPlayer('stop')" class="btn-danger">⏹️ Clear Queue</button>
             </div>
         </div>
-    </div>
 
-    <!-- API CREDENTIALS & MACROS -->
-    <div class="card full" style="margin-top: 1.5rem; border-left: 4px solid var(--blue);">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-            <div>
-                <h3>Spotify API Authentication</h3>
-                <span class="help-text">If left blank, the bot will use anonymous web scraping (which Spotify frequently blocks). Enter a valid Client ID and Secret to securely authenticate playlist scrapes. Note: The bot will need to be restarted to load these credentials.</span>
-                <label style="display:block; margin-top:8px; font-weight:600; font-size:0.88rem;">Client ID:</label>
-                <input type="text" id="spotifyClientId" placeholder="e.g. 8a2b3c4d5e6f7g8h9i0j1k2l">
-                <label style="display:block; margin-top:12px; font-weight:600; font-size:0.88rem;">Client Secret:</label>
-                <input type="password" id="spotifyClientSecret" placeholder="••••••••••••••••••••••••">
-                <button onclick="saveSpotifyKeys()" style="margin-top: 1rem; width: 100%;">🔑 Save API Keys</button>
-            </div>
-            <div>
+        <div class="grid-layout">
+            <div class="card" style="margin-bottom: 0;">
                 <h3>Playlist Manager & Hot-Load Macros</h3>
-                <span class="help-text">Assign a shortcode (e.g., <code>fng</code>) to instantly queue the target Spotify or YouTube playlist.</span>
-                <div id="plContainer" style="max-height: 200px; overflow-y: auto;"></div>
+                <span class="help-text">Assign a shortcode (e.g., <code>fng</code>) to instantly queue the target playlist.</span>
+                <div id="plContainer" style="max-height: 280px; overflow-y: auto;"></div>
                 <div style="margin-top: 1rem; display: flex; gap: 10px;">
                     <button onclick="addEmptyPlaylistRow()" class="btn-success">+ Add Row</button>
                     <button onclick="savePlaylists()">💾 Save Playlists</button>
                 </div>
             </div>
+
+            <div class="card" style="margin-bottom: 0;">
+                <h3>Live Queue Management</h3>
+                <span class="help-text">Drag items by handle ☰ to reorder, or use manual inputs.</span>
+                <div style="display: flex; gap: 8px; margin-bottom: 0.8rem;">
+                    <input type="text" id="remotePlayInput" placeholder="Queue track URL or shortcode (e.g., fng)..." style="flex: 1;">
+                    <button class="btn-success" onclick="remotePlay()">▶️ Play</button>
+                </div>
+                <div id="activeNowPlaying" style="color: var(--green); font-weight: bold; margin-bottom: 0.4rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">▶️ Nothing Playing</div>
+                <div class="queue-container" id="queueContainer"></div>
+                <div class="move-box">
+                    <span style="font-size:0.88rem;">Move #</span>
+                    <input type="number" id="moveFrom" min="1">
+                    <span style="font-size:0.88rem;">to #</span>
+                    <input type="number" id="moveTo" min="1">
+                    <button onclick="manualMoveTrack()" class="btn-success" style="padding: 0.65rem 1rem;">Move</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- LOGS & RETENTION CARD -->
-    <div class="card full" style="border-left: 4px solid var(--green);">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem;">
-            <div>
-                <h3 style="margin: 0;">🖥️ System Diagnostics & Log Management</h3>
-                <span class="help-text" style="margin: 0;">Auto-rotates and archives logs. Defers rotation while bot is actively in a voice channel.</span>
+    <!-- TAB: SYSTEM TOOLS -->
+    <div id="tab-tools" class="tab-content">
+        <div class="grid-layout">
+            <div class="card">
+                <h3>Spotify API Authentication</h3>
+                <span class="help-text">Enter a valid Client ID and Secret to securely authenticate playlist scrapes. Note: The bot will need to be restarted to lock these in.</span>
+                <label style="display:block; margin-top:8px; font-weight:600; font-size:0.88rem;">Client ID:</label>
+                <input type="text" id="spotifyClientId" placeholder="e.g. 8a2b3c4d5e6f7g8h9i0j1k2l">
+                <label style="display:block; margin-top:12px; font-weight:600; font-size:0.88rem;">Client Secret:</label>
+                <input type="password" id="spotifyClientSecret" placeholder="••••••••••••••••••••••••">
+                <button onclick="saveToolsConfig()" class="btn-success" style="margin-top: 1rem; width: 100%;">🔑 Save API Keys</button>
             </div>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <button onclick="window.open('/api/logs/export')" class="btn-secondary">📥 Export Log (.txt)</button>
-                <button onclick="fetchLogs()" class="btn-secondary">🔄 Refresh</button>
+
+            <div class="card">
+                <h3>Discord Channel Routing</h3>
+                <span class="help-text">Configure where control panels and automated logs should be sent.</span>
+                <label style="display:block; margin-top:8px; font-weight:600; font-size:0.88rem;">Dedicated Command / Panel Channel:</label>
+                <select id="panelChannelId"><option value="">-- No Restriction (Anywhere) --</option></select>
+                <label style="display:block; margin-top:12px; font-weight:600; font-size:0.88rem;">Notification Log Channel (Now Playing):</label>
+                <select id="logChannelId"><option value="">-- Do Not Send Logs --</option></select>
+                
+                <label style="display:flex; align-items:center; gap: 8px; margin-top:15px; font-size:0.9rem; cursor:pointer;">
+                    <input type="checkbox" id="autoHideMessages" style="width:18px; height:18px; accent-color: var(--blue);">
+                    <b>Auto-Hide Discord Messages</b> (Delete 'Now Playing' logs after 60 seconds)
+                </label>
+
+                <button onclick="saveToolsConfig()" class="btn-success" style="margin-top: 1rem; width: 100%;">💾 Save UI Routing</button>
             </div>
         </div>
 
-        <div class="terminal-box" id="terminalBox">Loading service logs...</div>
-
-        <div style="display: flex; gap: 15px; margin-top: 1rem; align-items: center; flex-wrap: wrap;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <label style="font-size: 0.88rem; font-weight: 600;">Log Retention:</label>
-                <select id="logRetentionDays" style="width: 140px;">
-                    <option value="3">3 Days</option>
-                    <option value="7">7 Days (Default)</option>
-                    <option value="14">14 Days</option>
-                    <option value="30">30 Days</option>
-                </select>
+        <div class="card full" style="border-left: 4px solid var(--green);">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem;">
+                <div>
+                    <h3 style="margin: 0;">🖥️ System Diagnostics & Log Management</h3>
+                    <span class="help-text" style="margin: 0;">Auto-rotates and archives logs. Defers rotation while bot is actively in a voice channel.</span>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button onclick="window.open('/api/logs/export')" class="btn-secondary">📥 Export (.txt)</button>
+                    <button onclick="fetchLogs()" class="btn-secondary">🔄 Refresh</button>
+                </div>
             </div>
-            <button onclick="saveLogRetention()" class="btn-success" style="padding: 0.65rem 1rem;">💾 Save Retention</button>
+
+            <div class="terminal-box" id="terminalBox">Loading service logs...</div>
+
+            <div style="display: flex; gap: 15px; margin-top: 1rem; align-items: center; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label style="font-size: 0.88rem; font-weight: 600;">Log Retention:</label>
+                    <select id="logRetentionDays" style="width: 140px;">
+                        <option value="3">3 Days</option>
+                        <option value="7">7 Days (Default)</option>
+                        <option value="14">14 Days</option>
+                        <option value="30">30 Days</option>
+                    </select>
+                </div>
+                <button onclick="saveToolsConfig()" class="btn-success" style="padding: 0.65rem 1rem;">💾 Save Retention</button>
+            </div>
         </div>
     </div>
 
@@ -179,10 +202,17 @@
         let cachedPlaylists = [];
         let isFirstLoad = true;
         let draggedIndex = null;
+        let isMuted = false;
+        let preMuteVol = 100;
 
-        function escapeHTML(str) {
-            return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag]));
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.querySelector(`.tab-btn[onclick="switchTab('${tabId}')"]`).classList.add('active');
+            document.getElementById(`tab-${tabId}`).classList.add('active');
         }
+
+        function escapeHTML(str) { return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag])); }
 
         function loadConfig() {
             fetch('/api/server-info').then(r => r.json()).then(data => {
@@ -192,7 +222,7 @@
             fetch('/api/channels').then(r => r.json()).then(channels => {
                 const panel = document.getElementById('panelChannelId');
                 const log = document.getElementById('logChannelId');
-                panel.innerHTML = '<option value="">-- No Restriction (Anywhere) --</option>';
+                panel.innerHTML = '<option value="">-- No Restriction --</option>';
                 log.innerHTML = '<option value="">-- Do Not Send Logs --</option>';
                 channels.forEach(c => {
                     panel.innerHTML += `<option value="${c.id}">#${c.name}</option>`;
@@ -204,6 +234,7 @@
                     if (data.panelChannelId) panel.value = data.panelChannelId;
                     if (data.logChannelId) log.value = data.logChannelId;
                     if (data.logRetentionDays) document.getElementById('logRetentionDays').value = data.logRetentionDays;
+                    if (data.autoHideMessages) document.getElementById('autoHideMessages').checked = true;
                     if (data.spotifyClientId) document.getElementById('spotifyClientId').value = data.spotifyClientId;
                     if (data.spotifyClientSecret) document.getElementById('spotifyClientSecret').value = data.spotifyClientSecret;
                     cachedPlaylists = data.savedPlaylists || [];
@@ -214,9 +245,7 @@
             fetch('/api/voice-channels').then(r => r.json()).then(channels => {
                 const vcSelect = document.getElementById('voiceChannelSelect');
                 vcSelect.innerHTML = '<option value="">-- Select Voice Channel --</option>';
-                channels.forEach(c => {
-                    vcSelect.innerHTML += `<option value="${c.id}">🔊 ${c.name}</option>`;
-                });
+                channels.forEach(c => { vcSelect.innerHTML += `<option value="${c.id}">🔊 ${c.name}</option>`; });
             });
             refreshQueue();
             fetchLogs();
@@ -225,30 +254,24 @@
         function fetchLogs() {
             fetch('/api/logs').then(r => r.json()).then(data => {
                 const box = document.getElementById('terminalBox');
-                box.innerText = data.logs || "Log file is currently empty.";
+                box.innerText = data.logs || "Log file is empty.";
                 box.scrollTop = box.scrollHeight;
             });
         }
 
-        function saveLogRetention() {
-            const days = parseInt(document.getElementById('logRetentionDays').value);
+        function saveToolsConfig() {
             fetch('/api/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ logRetentionDays: days })
-            }).then(() => alert(`Log retention set to ${days} days!`));
-        }
-        
-        function saveSpotifyKeys() {
-            const spotifyClientId = document.getElementById('spotifyClientId').value.trim();
-            const spotifyClientSecret = document.getElementById('spotifyClientSecret').value.trim();
-            fetch('/api/settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ spotifyClientId, spotifyClientSecret })
-            }).then(() => {
-                alert('Spotify API credentials saved. The bot must be restarted to lock them into the Extractor pipeline.');
-            });
+                body: JSON.stringify({ 
+                    logRetentionDays: parseInt(document.getElementById('logRetentionDays').value),
+                    spotifyClientId: document.getElementById('spotifyClientId').value.trim(),
+                    spotifyClientSecret: document.getElementById('spotifyClientSecret').value.trim(),
+                    panelChannelId: document.getElementById('panelChannelId').value,
+                    logChannelId: document.getElementById('logChannelId').value,
+                    autoHideMessages: document.getElementById('autoHideMessages').checked
+                })
+            }).then(() => alert(`Tool settings saved successfully!`));
         }
 
         function refreshQueue() {
@@ -272,6 +295,7 @@
                 if (isFirstLoad && data.volume !== undefined) {
                     document.getElementById('volSlider').value = data.volume;
                     document.getElementById('volLabel').innerText = data.volume;
+                    if (data.volume == 0) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; }
                     isFirstLoad = false;
                 }
             });
@@ -286,26 +310,17 @@
                     e.dataTransfer.effectAllowed = 'move';
                 });
                 item.addEventListener('dragend', () => item.classList.remove('dragging'));
-                item.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                });
+                item.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
                 item.addEventListener('drop', (e) => {
                     e.preventDefault();
                     const targetIndex = parseInt(item.getAttribute('data-index'));
-                    if (draggedIndex && targetIndex && draggedIndex !== targetIndex) {
-                        moveTrackApi(draggedIndex, targetIndex);
-                    }
+                    if (draggedIndex && targetIndex && draggedIndex !== targetIndex) moveTrackApi(draggedIndex, targetIndex);
                 });
             });
         }
 
         function moveTrackApi(from, to) {
-            fetch('/api/control', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'move', from, to })
-            }).then(() => refreshQueue());
+            fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move', from, to }) }).then(() => refreshQueue());
         }
 
         function manualMoveTrack() {
@@ -334,9 +349,26 @@
             .then(r => r.json()).then(res => { if(!res.success) alert(res.message); });
         }
 
+        function toggleMute() {
+            const slider = document.getElementById('volSlider');
+            if (isMuted) {
+                isMuted = false;
+                slider.value = preMuteVol;
+                document.getElementById('muteToggleBtn').innerText = '🔊';
+            } else {
+                isMuted = true;
+                preMuteVol = slider.value == 0 ? 100 : slider.value; // Save volume before mute, default to 100 if dragging from 0
+                slider.value = 0;
+                document.getElementById('muteToggleBtn').innerText = '🔇';
+            }
+            setVolume();
+        }
+
         function setVolume() {
             const vol = document.getElementById('volSlider').value;
             document.getElementById('volLabel').innerText = vol;
+            if (vol > 0 && isMuted) { isMuted = false; document.getElementById('muteToggleBtn').innerText = '🔊'; }
+            else if (vol == 0 && !isMuted) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; }
             fetch('/api/volume', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ volume: vol }) });
         }
 
@@ -390,11 +422,6 @@
             }
             fetch('/api/playlists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playlists: newPlaylists }) })
             .then(() => { alert('Playlists saved successfully!'); loadConfig(); });
-        }
-
-        function updateChannels() {
-            fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ panelChannelId: document.getElementById('panelChannelId').value, logChannelId: document.getElementById('logChannelId').value }) })
-            .then(() => alert('Channel Routing saved.'));
         }
 
         function openDiscordInvite() {

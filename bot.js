@@ -18,7 +18,11 @@ async function logNowPlaying(guild, track) {
                     .setTitle(track.title).setURL(track.url)
                     .setDescription(`${track.duration} - [${track.requestedBy ? track.requestedBy.toString() : 'Remote Dashboard'}]\nSong By: ${track.author}`)
                     .setThumbnail(track.thumbnail).setFooter({ text: `Volume 100% • MikoMusic` });
-                await channel.send({ embeds: [embed] });
+                const msg = await channel.send({ embeds: [embed] });
+                
+                if (config.autoHideMessages) {
+                    setTimeout(() => { msg.delete().catch(()=>{}); }, 60000);
+                }
             }
         } catch(e) {}
     }
@@ -51,20 +55,23 @@ async function ensureStandbyBanner(client) {
         const channel = client.channels.cache.get(config.panelChannelId);
         if (!channel || !channel.isTextBased()) return;
 
-        const messages = await channel.messages.fetch({ limit: 15 });
-        const existing = messages.find(m => m.author.id === client.user.id && m.components.some(r => r.components.some(c => c.customId === 'btn_summon_standby')));
+        // Clean up old banners so it always respawns at the bottom
+        const messages = await channel.messages.fetch({ limit: 30 });
+        messages.forEach(m => {
+            if (m.author.id === client.user.id && m.components.some(r => r.components.some(c => c.customId === 'btn_summon_standby'))) {
+                m.delete().catch(()=>{});
+            }
+        });
         
-        if (!existing) {
-            const embed = new EmbedBuilder()
-                .setColor('#89b4fa')
-                .setTitle('🎵 Miko Music Command Center')
-                .setDescription('Click below to summon the music bot into your voice channel without typing any commands.');
-            
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('btn_summon_standby').setLabel('🔊 Summon to Voice Channel').setStyle(ButtonStyle.Success)
-            );
-            await channel.send({ embeds: [embed], components: [row] });
-        }
+        const embed = new EmbedBuilder()
+            .setColor('#89b4fa')
+            .setTitle('🎵 Miko Music Command Center')
+            .setDescription('Click below to summon the music bot into your voice channel without typing any commands.');
+        
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('btn_summon_standby').setLabel('🔊 Summon to Voice Channel').setStyle(ButtonStyle.Success)
+        );
+        await channel.send({ embeds: [embed], components: [row] });
     } catch(e) {}
 }
 
@@ -77,26 +84,24 @@ function startBot() {
 
     player.events.on('error', (q, e) => console.log('❌ Player Error:', e.message));
     player.events.on('playerError', (q, e) => console.log('❌ Stream Blocked:', e.message));
-    player.events.on('playerSkip', (q, track) => console.log(`⚠️ Skipped Track: ${track.title}`));
-    
-    player.events.on('debug', (q, m) => {
-        if (m.toLowerCase().includes('bridge') || m.toLowerCase().includes('spotify') || m.toLowerCase().includes('extract')) {
-            console.log('🔍 [DEBUG]', m);
-        }
-    });
     
     player.events.on('playerStart', (queue, track) => { logNowPlaying(queue.guild, track); updatePanel(queue); });
     player.events.on('audioTrackAdd', (queue) => updatePanel(queue));
     player.events.on('audioTracksAdd', (queue) => updatePanel(queue));
     player.events.on('audioTrackRemove', (queue) => updatePanel(queue));
+    
+    // Refresh banner at bottom when queue dies or disconnects
     player.events.on('emptyQueue', (queue) => { updatePanel(queue); logger.checkDeferredRotation(); });
-    player.events.on('disconnect', (queue) => { updatePanel(queue); logger.checkDeferredRotation(); });
+    player.events.on('disconnect', (queue) => { 
+        updatePanel(queue); 
+        ensureStandbyBanner(client);
+        logger.checkDeferredRotation(); 
+    });
+    
     player.events.on('volumeChange', (queue) => updatePanel(queue));
 
     client.once('clientReady', async () => {
         try {
-            console.log("Loading Extractor Engines...");
-            
             const { DefaultExtractors, SpotifyExtractor } = require('@discord-player/extractor');
             const { YoutubeExtractor } = require('discord-player-youtubei');
             const config = getConfig();
@@ -105,27 +110,17 @@ function startBot() {
                 if (!YoutubeExtractor.identifier) YoutubeExtractor.identifier = 'com.discord-player.youtubei';
                 await player.extractors.register(YoutubeExtractor, {});
                 
-                // THE FIX: Feed dynamic Dashboard config straight into Spotify options
                 const spotifyOpts = { bridgeProvider: YoutubeExtractor };
                 if (config.spotifyClientId && config.spotifyClientSecret) {
                     spotifyOpts.clientId = config.spotifyClientId;
                     spotifyOpts.clientSecret = config.spotifyClientSecret;
-                    console.log("✅ Spotify API Credentials securely loaded from Dashboard!");
-                } else {
-                    console.log("⚠️ Spotify API Credentials empty. Using anonymous scraper (may be blocked).");
                 }
-
                 await player.extractors.register(SpotifyExtractor, spotifyOpts);
-                console.log("✅ Spotify explicitly bridged to Android TV Engine");
             }
 
             const remaining = DefaultExtractors.filter(ext => ext.name !== 'SpotifyExtractor');
             await player.extractors.loadMulti(remaining);
-            
-            console.log(`✅ All Extractors Active: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
-        } catch (e) {
-            console.error("❌ Fatal Extractor Pipeline Error:", e.stack);
-        }
+        } catch (e) {}
         
         console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
         await ensureStandbyBanner(client);
@@ -197,10 +192,9 @@ function startBot() {
             updatePanel(queue);
             const title = track.playlist ? track.playlist.title : track.title;
             const aliasTag = matchedMacro ? ` *(shortcode: ${matchedMacro.shortcode})*` : '';
-            await interaction.followUp({ content: `✅ Queued: **${title}**${aliasTag}`, ephemeral: true });
+            await interaction.followUp({ content: `✅ Queued: **${title}**${aliasTag}`, flags: [ 64 ] }); // 64 = Ephemeral
         } catch (err) {
-            console.error("Playback Error:", err.message);
-            await interaction.followUp(`❌ Failed to play track. Error: ${err.message}`);
+            await interaction.followUp({ content: `❌ Failed to play track. Error: ${err.message}`, flags: [ 64 ] });
         }
     }
 
@@ -209,53 +203,53 @@ function startBot() {
             if (interaction.isChatInputCommand()) {
                 if (interaction.commandName === 'summon') {
                     const channel = interaction.member.voice.channel;
-                    if (!channel) return interaction.reply({ content: '❌ You must be in a voice channel!', ephemeral: true });
+                    if (!channel) return interaction.reply({ content: '❌ You must be in a voice channel!', flags: [ 64 ] });
                     const config = getConfig();
                     if (config.panelChannelId && interaction.channelId !== config.panelChannelId) {
-                        return interaction.reply({ content: `❌ Please use the dedicated music panel channel.`, ephemeral: true });
+                        return interaction.reply({ content: `❌ Please use the dedicated music panel channel.`, flags: [ 64 ] });
                     }
-                    await interaction.deferReply();
+                    await interaction.deferReply({ flags: [ 64 ] });
                     await deployControlPanel(interaction.guild, channel, interaction.channel, interaction);
                 }
                 if (interaction.commandName === 'queue') {
                     const queue = player.nodes.get(interaction.guildId);
-                    if (!queue) return interaction.reply({ content: 'Nothing playing.', ephemeral: true });
+                    if (!queue) return interaction.reply({ content: 'Nothing playing.', flags: [ 64 ] });
                     const tracks = queue.tracks.toArray().slice(0, 10);
                     const embed = new EmbedBuilder().setColor('#2b2d31').setTitle(`Music Queue`).setDescription(`**Now Playing**\n${queue.currentTrack?.title}\n\n**Up Next**\n${tracks.map((t,i)=>`**${i+1}.**${t.title}`).join('\n')}`);
-                    return interaction.reply({ embeds: [embed], ephemeral: true });
+                    return interaction.reply({ embeds: [embed], flags: [ 64 ] });
                 }
                 if (interaction.commandName === 'move') {
                     const queue = player.nodes.get(interaction.guildId);
-                    if (!queue || queue.isEmpty()) return interaction.reply({ content: 'Queue is empty.', ephemeral: true });
+                    if (!queue || queue.isEmpty()) return interaction.reply({ content: 'Queue is empty.', flags: [ 64 ] });
                     const from = interaction.options.getInteger('track') - 1;
                     const to = interaction.options.getInteger('position') - 1;
                     const tracks = queue.tracks.toArray();
-                    if (from < 0 || from >= tracks.length || to < 0 || to >= tracks.length) return interaction.reply({ content: 'Invalid track numbers.', ephemeral: true });
+                    if (from < 0 || from >= tracks.length || to < 0 || to >= tracks.length) return interaction.reply({ content: 'Invalid track numbers.', flags: [ 64 ] });
                     
                     try { queue.node.move(from, to); } catch(e) {
                         const track = tracks[from];
                         queue.node.remove(track);
                         queue.node.insert(track, to);
                     }
-                    await interaction.reply({ content: `✅ Track moved successfully!`, ephemeral: true });
+                    await interaction.reply({ content: `✅ Track moved successfully!`, flags: [ 64 ] });
                     updatePanel(queue);
                 }
             }
             if (interaction.isButton()) {
                 if (interaction.customId === 'btn_summon_standby') {
                     const channel = interaction.member?.voice?.channel;
-                    if (!channel) return interaction.reply({ content: '❌ You must be inside a Voice Channel to summon the bot!', ephemeral: true });
-                    await interaction.deferReply({ ephemeral: true });
+                    if (!channel) return interaction.reply({ content: '❌ You must be inside a Voice Channel to summon the bot!', flags: [ 64 ] });
+                    await interaction.deferReply({ flags: [ 64 ] });
                     await deployControlPanel(interaction.guild, channel, interaction.channel, null);
-                    return interaction.followUp({ content: `✅ Bot connected to **${channel.name}** and panel ready!`, ephemeral: true });
+                    return interaction.followUp({ content: `✅ Bot connected to **${channel.name}** and panel ready!`, flags: [ 64 ] });
                 }
 
                 const queue = player.nodes.get(interaction.guildId);
                 if (interaction.customId === 'btn_queue') {
-                    if (!queue) return interaction.reply({ content: 'Nothing playing.', ephemeral: true });
+                    if (!queue) return interaction.reply({ content: 'Nothing playing.', flags: [ 64 ] });
                     const tracks = queue.tracks.toArray().slice(0, 10);
                     const embed = new EmbedBuilder().setColor('#2b2d31').setTitle(`Music Queue`).setDescription(`**Now Playing**\n${queue.currentTrack?.title}\n\n**Up Next**\n${tracks.map((t,i)=>`**${i+1}.**${t.title}`).join('\n')}`);
-                    return interaction.reply({ embeds: [embed], ephemeral: true });
+                    return interaction.reply({ embeds: [embed], flags: [ 64 ] });
                 }
                 if (interaction.customId === 'btn_add') {
                     const modal = new ModalBuilder().setCustomId('modal_search').setTitle('Add Track, URL, or Shortcode');
@@ -264,39 +258,39 @@ function startBot() {
                 }
                 if (interaction.customId === 'btn_playlists') {
                     const config = getConfig();
-                    if (!config.savedPlaylists || !config.savedPlaylists.length) return interaction.reply({ content: 'No playlists saved in dashboard.', ephemeral: true });
+                    if (!config.savedPlaylists || !config.savedPlaylists.length) return interaction.reply({ content: 'No playlists saved in dashboard.', flags: [ 64 ] });
                     const menu = new StringSelectMenuBuilder().setCustomId('menu_playlist').setPlaceholder('Select playlist to play');
                     config.savedPlaylists.slice(0, 25).forEach((pl, index) => { 
                         const codeStr = pl.shortcode ? ` [${pl.shortcode}]` : '';
                         menu.addOptions({ label: ((pl.name || 'Unnamed') + codeStr).substring(0, 95), value: index.toString() }); 
                     });
-                    return await interaction.reply({ components: [new ActionRowBuilder().addComponents(menu)], ephemeral: true });
+                    return await interaction.reply({ components: [new ActionRowBuilder().addComponents(menu)], flags: [ 64 ] });
                 }
-                if (!queue) return interaction.reply({ content: 'Nothing playing.', ephemeral: true });
+                if (!queue) return interaction.reply({ content: 'Nothing playing.', flags: [ 64 ] });
 
-                if (interaction.customId === 'btn_pause') { queue.node.setPaused(!queue.node.isPaused()); await interaction.reply({ content: '⏯️ Toggled.', ephemeral: true }); updatePanel(queue); }
-                if (interaction.customId === 'btn_skip') { queue.node.skip(); await interaction.reply({ content: '⏭️ Skipped.', ephemeral: true }); }
-                if (interaction.customId === 'btn_stop') { queue.delete(); await interaction.reply({ content: '⏹️ Stopped.', ephemeral: true }); }
-                if (interaction.customId === 'btn_back' && queue.history.previousTrack) { await queue.history.previous(); await interaction.reply({ content: '⏮️ Back.', ephemeral: true }); }
-                if (interaction.customId === 'btn_shuffle') { queue.tracks.shuffle(); await interaction.reply({ content: '🔀 Shuffled.', ephemeral: true }); updatePanel(queue); }
+                if (interaction.customId === 'btn_pause') { queue.node.setPaused(!queue.node.isPaused()); await interaction.reply({ content: '⏯️ Toggled.', flags: [ 64 ] }); updatePanel(queue); }
+                if (interaction.customId === 'btn_skip') { queue.node.skip(); await interaction.reply({ content: '⏭️ Skipped.', flags: [ 64 ] }); }
+                if (interaction.customId === 'btn_stop') { queue.delete(); await interaction.reply({ content: '⏹️ Stopped.', flags: [ 64 ] }); }
+                if (interaction.customId === 'btn_back' && queue.history.previousTrack) { await queue.history.previous(); await interaction.reply({ content: '⏮️ Back.', flags: [ 64 ] }); }
+                if (interaction.customId === 'btn_shuffle') { queue.tracks.shuffle(); await interaction.reply({ content: '🔀 Shuffled.', flags: [ 64 ] }); updatePanel(queue); }
                 if (interaction.customId === 'btn_loop') {
                     const m = queue.repeatMode === QueueRepeatMode.OFF ? QueueRepeatMode.TRACK : queue.repeatMode === QueueRepeatMode.TRACK ? QueueRepeatMode.QUEUE : QueueRepeatMode.OFF;
                     queue.setRepeatMode(m);
-                    await interaction.reply({ content: '🔁 Loop toggled.', ephemeral: true });
+                    await interaction.reply({ content: '🔁 Loop toggled.', flags: [ 64 ] });
                     updatePanel(queue);
                 }
             }
             if (interaction.isModalSubmit() && interaction.customId === 'modal_search') {
-                await interaction.deferReply({ ephemeral: true });
+                await interaction.deferReply({ flags: [ 64 ] });
                 await handlePlayback(interaction.member.voice.channel, interaction.fields.getTextInputValue('query'), interaction);
             }
             if (interaction.isStringSelectMenu() && interaction.customId === 'menu_playlist') {
-                await interaction.deferReply({ ephemeral: true });
+                await interaction.deferReply({ flags: [ 64 ] });
                 const url = getConfig().savedPlaylists[parseInt(interaction.values[0])]?.url;
-                if (!url) return interaction.followUp('❌ Could not find playlist URL.');
+                if (!url) return interaction.followUp({ content: '❌ Could not find playlist URL.', flags: [ 64 ] });
                 await handlePlayback(interaction.member.voice.channel, url, interaction);
             }
-        } catch (err) { try { await interaction.reply({ content: '❌ An error occurred.', ephemeral: true }); } catch(e){} }
+        } catch (err) { try { await interaction.reply({ content: '❌ An error occurred.', flags: [ 64 ] }); } catch(e){} }
     });
 
     client.login(process.env.DISCORD_TOKEN);
