@@ -97,44 +97,15 @@ function startBot() {
     client.once('clientReady', async () => {
         try {
             console.log("Loading Extractor Engines...");
-            const { DefaultExtractors, SpotifyExtractor } = require('@discord-player/extractor');
             
-            let tvModule;
-            try { tvModule = require('discord-player-youtubei'); } catch (err) {}
+            // 1. Force the engine to use YoutubeiExtractor from the package root
+            const YoutubeiExtractor = require("discord-player-youtubei").YoutubeiExtractor;
+            await player.extractors.register(YoutubeiExtractor, {});
+            console.log("✅ YoutubeiExtractor (Android TV) physically mounted");
 
-            let TVEngine = null;
-            if (tvModule) {
-                if (typeof tvModule === 'function') {
-                    TVEngine = tvModule;
-                } else if (typeof tvModule === 'object') {
-                    if (typeof tvModule.YoutubeiExtractor === 'function') TVEngine = tvModule.YoutubeiExtractor;
-                    else if (typeof tvModule.YouTubeiExtractor === 'function') TVEngine = tvModule.YouTubeiExtractor;
-                    else if (typeof tvModule.default === 'function') TVEngine = tvModule.default;
-                    else {
-                        for (const key in tvModule) {
-                            if (typeof tvModule[key] === 'function') { TVEngine = tvModule[key]; break; }
-                        }
-                    }
-                }
-            }
-
-            if (typeof TVEngine === 'function') {
-                if (!TVEngine.identifier) TVEngine.identifier = TVEngine.name || 'YoutubeiExtractor';
-                await player.extractors.register(TVEngine, {});
-                
-                // THE FIX: Get the live, running instance of the TV Engine
-                const liveTVInstance = player.extractors.get(TVEngine.identifier);
-                
-                // Pass the live instance to Spotify so it can physically execute searches
-                await player.extractors.register(SpotifyExtractor, { bridgeProvider: liveTVInstance });
-                console.log(`✅ Spotify explicitly bridged to live instance: ${TVEngine.identifier}`);
-            } else {
-                console.error(`❌ CRITICAL: TV Engine Class not found!`);
-                await player.extractors.register(SpotifyExtractor, {}); 
-            }
-
-            const remainingExtractors = DefaultExtractors.filter(ext => ext.name !== 'SpotifyExtractor');
-            await player.extractors.loadMulti(remainingExtractors);
+            // 2. Load the official DefaultExtractors (which includes Spotify, Apple, etc.)
+            const { DefaultExtractors } = require('@discord-player/extractor');
+            await player.extractors.loadMulti(DefaultExtractors);
             
             console.log(`✅ All Extractors Active: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
         } catch (e) {
@@ -200,7 +171,14 @@ function startBot() {
             let safeQuery = matchedMacro ? matchedMacro.url : rawQuery;
             
             if (safeQuery.includes('music.youtube.com')) safeQuery = safeQuery.replace('music.youtube.com', 'www.youtube.com');
-            try { const u = new URL(safeQuery); u.searchParams.delete('si'); safeQuery = u.toString(); } catch(e) {}
+            
+            // Clean Spotify Share links to prevent Extractor confusion
+            try { 
+                const u = new URL(safeQuery); 
+                u.searchParams.delete('si'); 
+                u.searchParams.delete('pi'); 
+                safeQuery = u.toString(); 
+            } catch(e) {}
             
             const existingQueue = player.nodes.get(interaction.guild.id);
             const panelMsg = existingQueue ? existingQueue.metadata.panelMessage : null;
