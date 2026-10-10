@@ -52,32 +52,32 @@
         <div>
             <div style="display: flex; align-items: center; gap: 10px;">
                 <h1 id="dashTitle">Miko Music Dashboard</h1>
-                <button onclick="editDashName()" class="btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;">✏️ Rename</button>
+                <button onclick="editDashName()" class="btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;">?? Rename</button>
             </div>
             <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px;">
-                <span style="color: var(--green); font-size: 0.88rem; font-weight: bold;">🖥️ Host: <span id="hostBadge">MIKOHOME</span></span>
+                <span style="color: var(--green); font-size: 0.88rem; font-weight: bold;">??? Host: <span id="hostBadge">MIKOHOME</span></span>
                 <span style="font-size: 0.85rem; color: #a6adc8;">| Active Guild:</span>
                 <select id="guildSelector" onchange="switchGuildContext()" style="width: auto; padding: 2px 8px; font-size: 0.85rem;"></select>
             </div>
         </div>
         <div style="display: flex; gap: 8px;">
-            <button class="btn-secondary" onclick="window.open('http://localhost:3001', '_blank')">🎙️ Miko SFX Dashboard</button>
-            <button class="btn-success" onclick="openDiscordInvite()">➕ Invite Bot</button>
+            <button class="btn-secondary" onclick="window.open('http://localhost:3001', '_blank')">??? Miko SFX Dashboard</button>
+            <button class="btn-success" onclick="openDiscordInvite()">? Invite Bot</button>
         </div>
     </div>
 
     <div class="tab-nav">
-        <button class="tab-btn active" onclick="switchTab('main')">🎧 Main Dashboard</button>
-        <button class="tab-btn" onclick="switchTab('tools')">⚙️ System Tools</button>
+        <button class="tab-btn active" onclick="switchTab('main')">?? Main Dashboard</button>
+        <button class="tab-btn" onclick="switchTab('tools')">?? System Tools</button>
     </div>
 
     <div id="tab-main" class="tab-content active">
         <div class="card full" style="border-left: 4px solid var(--blue);">
-            <h3>📡 Remote Voice Connection</h3>
+            <h3>?? Remote Voice Connection</h3>
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <select id="voiceChannelSelect" style="max-width: 320px;"><option value="">-- Select Voice Channel --</option></select>
-                <button onclick="manageVoice('join')" class="btn-success">🔊 Join Channel</button>
-                <button onclick="manageVoice('disconnect')" class="btn-danger">🔇 Disconnect</button>
+                <button onclick="manageVoice('join')" class="btn-success">?? Join Channel</button>
+                <button onclick="manageVoice('disconnect')" class="btn-danger">?? Disconnect</button>
             </div>
         </div>
 
@@ -86,30 +86,30 @@
                 <h3 style="margin: 0;">Live Audio Overrides & Controls</h3>
                 <div style="display: flex; align-items: center; gap: 10px; background: var(--input); padding: 0.4rem 0.9rem; border-radius: 20px; border: 1px solid var(--border);">
                     <span>Volume: <b id="volLabel">100</b>%</span>
-                    <button id="muteToggleBtn" onclick="toggleMute()" style="padding: 0; background: transparent; border: none; font-size: 1.2rem; cursor: pointer;">🔊</button>
+                    <button id="muteToggleBtn" onclick="toggleMute()" style="padding: 0; background: transparent; border: none; font-size: 1.2rem; cursor: pointer;">??</button>
                     <input type="range" id="volSlider" min="0" max="200" value="100" onchange="setVolume()" style="width: 140px; cursor: pointer;">
                 </div>
             </div>
             <div class="overrides-grid">
-                <button onclick="controlPlayer('back')">⏮️ Back</button>
-                <button onclick="controlPlayer('pause')">⏯️ Play / Pause</button>
-                <button onclick="controlPlayer('skip')">⏭️ Skip</button>
-                <button onclick="controlPlayer('shuffle')" class="btn-warning">🔀 Shuffle</button>
-                <button onclick="controlPlayer('loopTrack')" class="btn-success">🔂 Loop Track</button>
-                <button onclick="controlPlayer('loopQueue')" class="btn-success">🔁 Loop Queue</button>
-                <button onclick="controlPlayer('loopOff')" class="btn-danger">❌ Loop Off</button>
-                <button onclick="controlPlayer('stop')" class="btn-danger">⏹️ Clear Queue</button>
+                <button onclick="controlPlayer('back')">?? Back</button>
+                <button onclick="controlPlayer('pause')">?? Play / Pause</button>
+                <button onclick="controlPlayer('skip')">?? Skip</button>
+                <button onclick="controlPlayer('shuffle')" class="btn-warning">?? Shuffle</button>
+                <button onclick="controlPlayer('loopTrack')" class="btn-success">?? Loop Track</button>
+                <button onclick="controlPlayer('loopQueue')" class="btn-success">?? Loop Queue</button>
+                <button onclick="controlPlayer('loopOff')" class="btn-danger">? Loop Off</button>
+                <button onclick="controlPlayer('stop')" class="btn-danger">?? Clear Queue</button>
             </div>
         </div>
 
         <div class="grid-layout">
             <div class="card" style="margin-bottom: 0;">
                 <h3>Playlist Manager & Hot-Load Macros</h3>
-                <span class="help-text">Click <b>▶ Load</b> to instantly purge the active queue and start that playlist. Click <b>🔗</b> to open and manage tracks on Spotify or YouTube.</span>
+                <span class="help-text">Click <b>? Load</b> to instantly purge the active queue and start that playlist. Click <b>??</b> to open and manage tracks on Spotify or YouTube.</span>
                 <div id="plContainer" style="max-height: 320px; overflow-y: auto;"></div>
                 <div style="margin-top: 1rem; display: flex; gap: 10px;">
                     <button onclick="addEmptyPlaylistRow()" class="btn-success">+ Add Row</button>
-                    <button onclick="savePlaylists()">💾 Save Playlists</button>
+                    <button onclick="savePlaylists()">?? Save Playlists</button>
                 </div>
             </div>
 
@@ -119,12 +119,12 @@
                 </div>
                 <div style="display: flex; gap: 8px; margin-bottom: 0.8rem;">
                     <input type="text" id="remotePlayInput" placeholder="Queue track URL or shortcode (e.g., fng)..." style="flex: 1;">
-                    <button class="btn-success" onclick="remotePlay()">▶️ Play</button>
+                    <button class="btn-success" onclick="remotePlay()">?? Play</button>
                 </div>
                 
-                <div id="activeNowPlaying" style="color: var(--green); font-weight: bold; margin-bottom: 0.4rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">▶️ Nothing Playing</div>
+                <div id="activeNowPlaying" style="color: var(--green); font-weight: bold; margin-bottom: 0.4rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">?? Nothing Playing</div>
                 
-                <input type="text" id="queueSearch" placeholder="🔍 Search queue to find or remove tracks..." oninput="filterQueue()" style="margin-bottom: 0.5rem; background: var(--card-alt);">
+                <input type="text" id="queueSearch" placeholder="?? Search queue to find or remove tracks..." oninput="filterQueue()" style="margin-bottom: 0.5rem; background: var(--card-alt);">
                 <div class="queue-container" id="queueContainer"></div>
                 
                 <div class="move-box">
@@ -148,7 +148,7 @@
                 <input type="text" id="spotifyClientId" placeholder="e.g. 8a2b3c4d5e6f7g8h9i0j1k2l">
                 <label style="display:block; margin-top:12px; font-weight:600; font-size:0.88rem;">Client Secret:</label>
                 <input type="password" id="spotifyClientSecret" placeholder="••••••••••••••••••••••••">
-                <button onclick="saveToolsConfig()" class="btn-success" style="margin-top: 1rem; width: 100%;">🔑 Save API Keys</button>
+                <button onclick="saveToolsConfig()" class="btn-success" style="margin-top: 1rem; width: 100%;">?? Save API Keys</button>
             </div>
 
             <div class="card">
@@ -163,20 +163,20 @@
                     <input type="checkbox" id="autoHideMessages" style="width:18px; height:18px; accent-color: var(--blue);">
                     <b>Auto-Hide Discord Messages</b> (Delete 'Now Playing' logs after 60s)
                 </label>
-                <button onclick="saveToolsConfig()" class="btn-success" style="margin-top: 1rem; width: 100%;">💾 Save UI Routing</button>
+                <button onclick="saveToolsConfig()" class="btn-success" style="margin-top: 1rem; width: 100%;">?? Save UI Routing</button>
             </div>
         </div>
 
         <div class="card full" style="border-left: 4px solid var(--green);">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem;">
                 <div>
-                    <h3 style="margin: 0;">🖥️ Diagnostics, Retention & Logging</h3>
+                    <h3 style="margin: 0;">??? Diagnostics, Retention & Logging</h3>
                     <span class="help-text" style="margin: 0;">Host Time: <b id="systemTimeLabel">Loading...</b> (Schedules execute against host local time).</span>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
-                    <button onclick="window.open('/api/logs/export')" class="btn-secondary">📥 Export (.txt)</button>
-                    <button onclick="fetchLogs()" class="btn-secondary">🔄 Refresh</button>
-                    <button onclick="restartService()" class="btn-danger">⚠️ Restart Service</button>
+                    <button onclick="window.open('/api/logs/export')" class="btn-secondary">?? Export (.txt)</button>
+                    <button onclick="fetchLogs()" class="btn-secondary">?? Refresh</button>
+                    <button onclick="restartService()" class="btn-danger">?? Restart Service</button>
                 </div>
             </div>
 
@@ -213,28 +213,28 @@
                     <input type="text" id="logDirectory" placeholder="C:\Apps\MikoDiscordMusicBot\logs">
                 </div>
             </div>
-            <button onclick="saveToolsConfig()" class="btn-success" style="margin-top: 1rem;">💾 Save Diagnostic Settings</button>
+            <button onclick="saveToolsConfig()" class="btn-success" style="margin-top: 1rem;">?? Save Diagnostic Settings</button>
         </div>
 
         <div class="card full" style="border-left: 4px solid var(--blue);">
-            <h3>📖 Miko Music Quick-Start Guide</h3>
+            <h3>?? Miko Music Quick-Start Guide</h3>
             <span class="help-text">Click a section below for quick reference instructions.</span>
 
             <div class="accordion-header" onclick="toggleAccordion('guide-queue')">
-                <span>1. Multi-Server & Live Playlist Controls</span><span>▼</span>
+                <span>1. Multi-Server & Live Playlist Controls</span><span>?</span>
             </div>
             <div id="guide-queue" class="accordion-body">
                 • <b>Multi-Server Support:</b> Use the <b>Active Guild</b> dropdown in the header to switch between Discord servers. The dashboard will instantly isolate and control the audio queue for that specific guild.<br>
-                • <b>Direct Load:</b> Click <b>▶ Load</b> next to any playlist in the manager to purge the active queue and start that list without typing or copy-pasting.<br>
-                • <b>Platform Links:</b> Click <b>🔗</b> to jump directly into Spotify or YouTube Music and manage the tracklist in your browser.
+                • <b>Direct Load:</b> Click <b>? Load</b> next to any playlist in the manager to purge the active queue and start that list without typing or copy-pasting.<br>
+                • <b>Platform Links:</b> Click <b>??</b> to jump directly into Spotify or YouTube Music and manage the tracklist in your browser.
             </div>
 
             <div class="accordion-header" onclick="toggleAccordion('guide-channels')">
-                <span>2. Discord Controls & Ephemeral Cleanliness</span><span>▼</span>
+                <span>2. Discord Controls & Ephemeral Cleanliness</span><span>?</span>
             </div>
             <div id="guide-channels" class="accordion-body">
-                • <b>Discord Queue Pagination:</b> Clicking <b>📋 Queue</b> in Discord now renders interactive pages (<code>|◀</code>, <code>◀</code>, <code>▶</code>, <code>▶|</code>) for full queue navigation.<br>
-                • <b>Move via Discord:</b> Click <b>↕️ Move</b> on the Discord panel to open a quick modal and change track orders on the fly.<br>
+                • <b>Discord Queue Pagination:</b> Clicking <b>?? Queue</b> in Discord now renders interactive pages (<code>|?</code>, <code>?</code>, <code>?</code>, <code>?|</code>) for full queue navigation.<br>
+                • <b>Move via Discord:</b> Click <b>?? Move</b> on the Discord panel to open a quick modal and change track orders on the fly.<br>
                 • <b>Self-Cleaning Messages:</b> All interaction responses are Discord Ephemerals ("Only you can see this") and auto-purge when Discord restarts.
             </div>
         </div>
@@ -312,18 +312,18 @@
             const guildId = getActiveGuildId();
             fetch(`/api/queue?guildId=${guildId}`).then(r => r.json()).then(data => {
                 currentQueueState = data;
-                document.getElementById('activeNowPlaying').innerText = data.current ? `▶️ Now Playing: ${data.current}` : '▶️ Nothing Playing';
+                document.getElementById('activeNowPlaying').innerText = data.current ? `?? Now Playing: ${data.current}` : '?? Nothing Playing';
                 const qc = document.getElementById('queueContainer');
                 if (!data.tracks || !data.tracks.length) qc.innerHTML = '<div style="color:#6c7086; padding:0.5rem; font-size:0.9rem;">Queue is empty.</div>';
                 else {
                     qc.innerHTML = data.tracks.map(t => `
                         <div class="queue-item" draggable="true" data-index="${t.index}">
-                            <span class="drag-handle">☰</span><span style="font-weight: bold; width: 22px;">${t.index}.</span><span class="queue-title">${escapeHTML(t.title)}</span>
-                            <button class="btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; margin-left: auto;" onclick="removeTrackApi(${t.index})">✕</button>
+                            <span class="drag-handle">?</span><span style="font-weight: bold; width: 22px;">${t.index}.</span><span class="queue-title">${escapeHTML(t.title)}</span>
+                            <button class="btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; margin-left: auto;" onclick="confirmRemoveTrackApi(${t.index})">?</button>
                         </div>`).join('');
                     bindDragEvents(); filterQueue();
                 }
-                if (isFirstLoad && data.volume !== undefined) { document.getElementById('volSlider').value = data.volume; document.getElementById('volLabel').innerText = data.volume; if (data.volume == 0) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; } isFirstLoad = false; }
+                if (isFirstLoad && data.volume !== undefined) { document.getElementById('volSlider').value = data.volume; document.getElementById('volLabel').innerText = data.volume; if (data.volume == 0) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '??'; } isFirstLoad = false; }
             });
         }
 
@@ -346,7 +346,7 @@
             });
         }
 
-        function removeTrackApi(index) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'remove', index, guildId: getActiveGuildId() }) }).then(() => refreshQueue()); }
+        function confirmRemoveTrackApi(index) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'remove', index, guildId: getActiveGuildId() }) }).then(() => refreshQueue()); }
         function moveTrackApi(from, to) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move', from, to, guildId: getActiveGuildId() }) }).then(() => refreshQueue()); }
         function manualMoveTrack() { const f = document.getElementById('moveFrom').value, t = document.getElementById('moveTo').value; if (!f || !t) return; moveTrackApi(parseInt(f), parseInt(t)); document.getElementById('moveFrom').value = ''; document.getElementById('moveTo').value = ''; }
 
@@ -355,8 +355,8 @@
         function editDashName() { const n = prompt("Enter new dashboard name:", document.getElementById('dashTitle').innerText); if (n && n.trim() !== '') fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dashboardName: n.trim() }) }).then(() => document.getElementById('dashTitle').innerText = n.trim()); }
         function manageVoice(action) { const channelId = document.getElementById('voiceChannelSelect').value; fetch('/api/voice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, channelId, guildId: getActiveGuildId() }) }).then(r => r.json()).then(res => { if(!res.success) alert(res.message); }); }
         
-        function toggleMute() { const s = document.getElementById('volSlider'); if (isMuted) { isMuted = false; s.value = preMuteVol; document.getElementById('muteToggleBtn').innerText = '🔊'; } else { isMuted = true; preMuteVol = s.value == 0 ? 100 : s.value; s.value = 0; document.getElementById('muteToggleBtn').innerText = '🔇'; } setVolume(); }
-        function setVolume() { const v = document.getElementById('volSlider').value; document.getElementById('volLabel').innerText = v; if (v > 0 && isMuted) { isMuted = false; document.getElementById('muteToggleBtn').innerText = '🔊'; } else if (v == 0 && !isMuted) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; } fetch('/api/volume', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ volume: v, guildId: getActiveGuildId() }) }); }
+        function toggleMute() { const s = document.getElementById('volSlider'); if (isMuted) { isMuted = false; s.value = preMuteVol; document.getElementById('muteToggleBtn').innerText = '??'; } else { isMuted = true; preMuteVol = s.value == 0 ? 100 : s.value; s.value = 0; document.getElementById('muteToggleBtn').innerText = '??'; } setVolume(); }
+        function setVolume() { const v = document.getElementById('volSlider').value; document.getElementById('volLabel').innerText = v; if (v > 0 && isMuted) { isMuted = false; document.getElementById('muteToggleBtn').innerText = '??'; } else if (v == 0 && !isMuted) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '??'; } fetch('/api/volume', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ volume: v, guildId: getActiveGuildId() }) }); }
 
         async function directLoadPlaylist(url) {
             if (confirm("Clear active queue and stream this playlist now?")) {
@@ -376,27 +376,40 @@
         function renderPlaylists() {
             const c = document.getElementById('plContainer'); c.innerHTML = '';
             cachedPlaylists.forEach((pl, i) => {
-                const tag = (pl.url || '').includes('spotify') ? '🟢' : '🔴';
+                const tag = (pl.url || '').includes('spotify') ? '??' : '??';
                 c.innerHTML += `
                     <div class="pl-item">
-                        <span title="${tag === '🟢' ? 'Spotify' : 'YouTube'}">${tag}</span>
+                        <span title="${tag === '??' ? 'Spotify' : 'YouTube'}">${tag}</span>
                         <input type="text" value="${pl.name || ''}" id="pl-name-${i}" placeholder="Name" oninput="syncPlaylistsFromDOM()">
                         <input type="text" value="${pl.shortcode || ''}" id="pl-code-${i}" placeholder="Code" oninput="syncPlaylistsFromDOM()">
                         <input type="text" value="${pl.url || ''}" id="pl-url-${i}" placeholder="URL" oninput="syncPlaylistsFromDOM()">
-                        <button class="btn-success" onclick="directLoadPlaylist('${escapeHTML(pl.url || '')}')">▶ Load</button>
-                        <button class="btn-secondary" onclick="window.open('${escapeHTML(pl.url || '')}', '_blank')" title="Manage on source">🔗</button>
-                        <button class="btn-danger" onclick="removePlaylistRow(${i})">✕</button>
+                        <button class="btn-success" onclick="directLoadPlaylist('${escapeHTML(pl.url || '')}')">? Load</button>
+                        <button class="btn-secondary" onclick="window.open('${escapeHTML(pl.url || '')}', '_blank')" title="Manage on source">??</button>
+                        <button class="btn-danger" onclick="confirmRemovePlaylistRow(${i})">?</button>
                     </div>`;
             });
         }
 
         function addEmptyPlaylistRow() { syncPlaylistsFromDOM(); cachedPlaylists.push({ name: '', shortcode: '', url: '' }); renderPlaylists(); }
-        function removePlaylistRow(i) { syncPlaylistsFromDOM(); cachedPlaylists.splice(i, 1); renderPlaylists(); }
+        function confirmRemovePlaylistRow(i) { syncPlaylistsFromDOM(); cachedPlaylists.splice(i, 1); renderPlaylists(); }
         function savePlaylists() { syncPlaylistsFromDOM(); const np = []; for (let i = 0; i < cachedPlaylists.length; i++) { const n = cachedPlaylists[i].name?.trim(), c = (cachedPlaylists[i].shortcode || '').toLowerCase().trim(), u = cachedPlaylists[i].url?.trim(); if (n && u) np.push({ name: n, shortcode: c, url: u }); } fetch('/api/playlists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playlists: np }) }).then(() => { alert('Playlists saved successfully!'); loadConfig(); }); }
-        function openDiscordInvite() { fetch('/api/config').then(r => r.json()).then(data => { const id = data.clientId || prompt("Paste your Application ID:"); if (id) window.open(`https://discord.com/oauth2/authorize?client_id=${id}&permissions=3148800&scope=bot%20applications.commands`, 'popup', 'width=500,height=750'); }); }
+        function openDiscordInvite() {
+            fetch('/api/config').then(r => r.json()).then(data => {
+                const id = data.clientId || prompt("Paste your Application ID:");
+                if (id) {
+                    const a = document.createElement('a');
+                    a.href = https://discord.com/oauth2/authorize?client_id=&permissions=3148800&scope=bot%20applications.commands;
+                    a.target = '_blank';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }
+            });
+        }
         function controlPlayer(action) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, guildId: getActiveGuildId() }) }).then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); fetchLogs(); }); }
 
         loadConfig();
     </script>
 </body>
 </html>
+

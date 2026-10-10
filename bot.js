@@ -5,11 +5,20 @@ const logger = require('./logger');
 
 function getConfig() { try { return JSON.parse(fs.readFileSync('./config.json', 'utf-8')); } catch (e) { return {}; } }
 
-async function cleanChannel(channel, client) {
+async function cleanChannel(channel, client, type) {
     try {
         const msgs = await channel.messages.fetch({ limit: 50 });
-        for (const [id, m] of msgs) { if (m.author.id === client.user.id) await m.delete().catch(()=>{}); }
+        for (const [id, m] of msgs) { 
+            if (m.author.id === client.user.id) {
+                const isStandby = m.embeds[0]?.title?.includes('Standby');
+                const isCommand = m.embeds[0]?.title?.includes('Command Center');
+                if (type === 'standby' && isStandby) await m.delete().catch(()=>{});
+                if (type === 'command' && isCommand) await m.delete().catch(()=>{});
+                if (type === 'both' && (isStandby || isCommand)) await m.delete().catch(()=>{});
+            }
+        }
     } catch(e) {}
+}
 }
 
 async function logNowPlaying(guild, track, queue) {
@@ -62,7 +71,7 @@ async function ensureStandbyBanner(client) {
         const channel = client.channels.cache.get(config.panelChannelId);
         if (!channel || !channel.isTextBased()) return;
 
-        await cleanChannel(channel, client);
+        await cleanChannel(channel, client, 'both');
         
         const embed = new EmbedBuilder()
             .setColor('#89b4fa')
@@ -151,7 +160,7 @@ function startBot() {
         const queue = player.nodes.create(guild, { metadata: { channel: targetTextChannel, panelMessage: null }, leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false, bufferingTimeout: 0 });
         if (!queue.connection) await queue.connect(channel);
         
-        await cleanChannel(targetTextChannel, client);
+        await cleanChannel(targetTextChannel, client, 'both');
         
         const embed = new EmbedBuilder().setColor('#89b4fa').setTitle('🎛️ Miko Music Command Center').setDescription('*Nothing is currently playing. Load a playlist below to begin!*');
         
@@ -300,3 +309,4 @@ function startBot() {
     return client;
 }
 module.exports = { startBot };
+
