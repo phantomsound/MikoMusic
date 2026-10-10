@@ -79,7 +79,6 @@ function startBot() {
     player.events.on('playerError', (q, e) => console.log('❌ Stream Blocked:', e.message));
     player.events.on('playerSkip', (q, track) => console.log(`⚠️ Skipped Track: ${track.title}`));
     
-    // Live Search Engine Debugging
     player.events.on('debug', (q, m) => {
         if (m.toLowerCase().includes('bridge') || m.toLowerCase().includes('spotify') || m.toLowerCase().includes('extract')) {
             console.log('🔍 [DEBUG]', m);
@@ -98,14 +97,41 @@ function startBot() {
         try {
             console.log("Loading Extractor Engines...");
             
-            // 1. Force the engine to use YoutubeiExtractor from the package root
-            const YoutubeiExtractor = require("discord-player-youtubei").YoutubeiExtractor;
-            await player.extractors.register(YoutubeiExtractor, {});
-            console.log("✅ YoutubeiExtractor (Android TV) physically mounted");
+            let tvModule;
+            try { 
+                tvModule = require('discord-player-youtubei'); 
+            } catch (e) { 
+                tvModule = await import('discord-player-youtubei'); 
+            }
+            
+            let TVClass = tvModule.YoutubeiExtractor || tvModule.YouTubeiExtractor || tvModule.default?.YoutubeiExtractor || tvModule.default?.YouTubeiExtractor;
+            
+            if (!TVClass) {
+                console.log("🔍 [DEBUG] Module keys found:", Object.keys(tvModule).join(', '));
+                for (const val of Object.values(tvModule)) {
+                    if (typeof val === 'function' && val.name && val.name.toLowerCase().includes('youtubei')) {
+                        TVClass = val; 
+                        break;
+                    }
+                }
+            }
 
-            // 2. Load the official DefaultExtractors (which includes Spotify, Apple, etc.)
-            const { DefaultExtractors } = require('@discord-player/extractor');
-            await player.extractors.loadMulti(DefaultExtractors);
+            if (TVClass) {
+                if (!TVClass.identifier) TVClass.identifier = 'com.discord-player-youtubei';
+                await player.extractors.register(TVClass, {});
+                console.log(`✅ ${TVClass.name || 'Android TV Extractor'} Mounted!`);
+                
+                const { SpotifyExtractor, DefaultExtractors } = require('@discord-player/extractor');
+                await player.extractors.register(SpotifyExtractor, { bridgeProvider: TVClass });
+                console.log("✅ Spotify explicitly bridged to Android TV Engine");
+                
+                const remaining = DefaultExtractors.filter(ext => ext.name !== 'SpotifyExtractor');
+                await player.extractors.loadMulti(remaining);
+            } else {
+                console.log("⚠️ Could not isolate Android TV class. Falling back to safe defaults.");
+                const { DefaultExtractors } = require('@discord-player/extractor');
+                await player.extractors.loadMulti(DefaultExtractors);
+            }
             
             console.log(`✅ All Extractors Active: ${player.extractors.store.map(e => e.identifier).join(', ')}`);
         } catch (e) {
@@ -172,7 +198,6 @@ function startBot() {
             
             if (safeQuery.includes('music.youtube.com')) safeQuery = safeQuery.replace('music.youtube.com', 'www.youtube.com');
             
-            // Clean Spotify Share links to prevent Extractor confusion
             try { 
                 const u = new URL(safeQuery); 
                 u.searchParams.delete('si'); 
