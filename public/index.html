@@ -28,8 +28,11 @@
         .overrides-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 1rem; }
         @media (max-width: 700px) { .overrides-grid { grid-template-columns: repeat(2, 1fr); } }
         .overrides-grid button { width: 100%; padding: 0.75rem; }
-        .pl-item { display: grid; grid-template-columns: 2fr 1.2fr 3.5fr 45px; gap: 10px; background: var(--input); padding: 0.75rem; border-radius: 6px; margin-top: 0.5rem; align-items: center; border: 1px solid var(--border); }
-        .pl-item button { padding: 0.65rem; }
+        
+        .pl-item { display: grid; grid-template-columns: 28px 1.8fr 1fr 2.5fr 70px 40px 35px; gap: 6px; background: var(--input); padding: 0.6rem; border-radius: 6px; margin-top: 0.5rem; align-items: center; border: 1px solid var(--border); }
+        .pl-item input { padding: 0.45rem; font-size: 0.88rem; }
+        .pl-item button { padding: 0.45rem 0.6rem; font-size: 0.82rem; }
+
         .queue-container { max-height: 220px; overflow-y: auto; background: var(--input); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; margin-top: 0.5rem; }
         .queue-item { display: flex; align-items: center; gap: 10px; padding: 0.55rem 0.75rem; background: var(--card); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 6px; cursor: grab; user-select: none; transition: background 0.15s; }
         .queue-item:hover { background: var(--card-alt); }
@@ -51,9 +54,16 @@
                 <h1 id="dashTitle">Miko Music Dashboard</h1>
                 <button onclick="editDashName()" class="btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;">✏️ Rename</button>
             </div>
-            <span id="serverBadge" style="color: var(--green); font-size: 0.88rem; font-weight: bold;">📡 Active Server: Loading...</span>
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px;">
+                <span style="color: var(--green); font-size: 0.88rem; font-weight: bold;">🖥️ Host: <span id="hostBadge">MIKOHOME</span></span>
+                <span style="font-size: 0.85rem; color: #a6adc8;">| Active Guild:</span>
+                <select id="guildSelector" onchange="switchGuildContext()" style="width: auto; padding: 2px 8px; font-size: 0.85rem;"></select>
+            </div>
         </div>
-        <button class="btn-success" onclick="openDiscordInvite()">➕ Invite Bot to Server</button>
+        <div style="display: flex; gap: 8px;">
+            <button class="btn-secondary" onclick="window.open('http://localhost:3001', '_blank')">🎙️ Miko SFX Dashboard</button>
+            <button class="btn-success" onclick="openDiscordInvite()">➕ Invite Bot</button>
+        </div>
     </div>
 
     <div class="tab-nav">
@@ -95,8 +105,8 @@
         <div class="grid-layout">
             <div class="card" style="margin-bottom: 0;">
                 <h3>Playlist Manager & Hot-Load Macros</h3>
-                <span class="help-text">Assign a shortcode (e.g., <code>fng</code>) to instantly queue the target playlist.</span>
-                <div id="plContainer" style="max-height: 280px; overflow-y: auto;"></div>
+                <span class="help-text">Click <b>▶ Load</b> to instantly purge the active queue and start that playlist. Click <b>🔗</b> to open and manage tracks on Spotify or YouTube.</span>
+                <div id="plContainer" style="max-height: 320px; overflow-y: auto;"></div>
                 <div style="margin-top: 1rem; display: flex; gap: 10px;">
                     <button onclick="addEmptyPlaylistRow()" class="btn-success">+ Add Row</button>
                     <button onclick="savePlaylists()">💾 Save Playlists</button>
@@ -161,7 +171,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem;">
                 <div>
                     <h3 style="margin: 0;">🖥️ Diagnostics, Retention & Logging</h3>
-                    <span class="help-text" style="margin: 0;">Configure log destinations, retention intervals, and process controls.</span>
+                    <span class="help-text" style="margin: 0;">Host Time: <b id="systemTimeLabel">Loading...</b> (Schedules execute against host local time).</span>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <button onclick="window.open('/api/logs/export')" class="btn-secondary">📥 Export (.txt)</button>
@@ -193,8 +203,8 @@
                 <div>
                     <label style="font-size: 0.85rem; font-weight: 600;">Backup Schedule:</label>
                     <select id="logBackupSchedule">
-                        <option value="daily">Daily at Midnight</option>
-                        <option value="12h">Every 12 Hours</option>
+                        <option value="daily">Daily at Midnight (Local)</option>
+                        <option value="12h">Every 12 Hours (Local)</option>
                         <option value="on_empty">On Queue Empty</option>
                     </select>
                 </div>
@@ -208,32 +218,24 @@
 
         <div class="card full" style="border-left: 4px solid var(--blue);">
             <h3>📖 Miko Music Quick-Start Guide</h3>
-            <span class="help-text">Click a section below for quick reference instructions. GitHub README has been similarly mapped.</span>
+            <span class="help-text">Click a section below for quick reference instructions.</span>
 
             <div class="accordion-header" onclick="toggleAccordion('guide-queue')">
-                <span>1. Queue Management & Live Playlist Syncing</span><span>▼</span>
+                <span>1. Multi-Server & Live Playlist Controls</span><span>▼</span>
             </div>
             <div id="guide-queue" class="accordion-body">
-                • <b>Searching & Removing:</b> Use the search bar above the queue to filter songs instantly. Click the <b>✕</b> to drop a track.<br>
-                • <b>Playlist Synchronicity:</b> Every time you queue a playlist URL or shortcode, the bot scrapes YouTube/Spotify in real-time. If you add songs to your actual Spotify playlist, they instantly appear the next time you load it in Miko.<br>
-                • <b>Non-Destructive Clear:</b> Clicking <b>Clear Queue</b> safely empties the tracks and pauses playback without dropping the bot from voice.
+                • <b>Multi-Server Support:</b> Use the <b>Active Guild</b> dropdown in the header to switch between Discord servers. The dashboard will instantly isolate and control the audio queue for that specific guild.<br>
+                • <b>Direct Load:</b> Click <b>▶ Load</b> next to any playlist in the manager to purge the active queue and start that list without typing or copy-pasting.<br>
+                • <b>Platform Links:</b> Click <b>🔗</b> to jump directly into Spotify or YouTube Music and manage the tracklist in your browser.
             </div>
 
             <div class="accordion-header" onclick="toggleAccordion('guide-channels')">
-                <span>2. The Phantom Dashboard & Auto-Hiding Logs</span><span>▼</span>
+                <span>2. Discord Controls & Ephemeral Cleanliness</span><span>▼</span>
             </div>
             <div id="guide-channels" class="accordion-body">
-                • <b>Persistent Panels:</b> The bot automatically sweeps the Control Panel channel to delete old panels and banners, ensuring your buttons always stay locked at the bottom of the chat.<br>
-                • <b>Self-Cleaning Replies:</b> "Only you can see this" messages are Discord-side Ephemerals. The bot cannot delete them, but they auto-hide forever when you close the app.<br>
-                • <b>Now Playing Logs:</b> Enable <b>Auto-Hide Discord Messages</b> to have the bot physically delete song notification logs after 60 seconds.
-            </div>
-
-            <div class="accordion-header" onclick="toggleAccordion('guide-sfx')">
-                <span>3. Architecture Note: Music vs Soundboards</span><span>▼</span>
-            </div>
-            <div id="guide-sfx" class="accordion-body">
-                • Discord physically prevents a single bot from playing two audio streams at the same time.<br>
-                • For overlapping D&D sound effects, the recommended architecture is deploying a secondary, lightweight sibling bot ("Miko SFX") that hosts an overlapping soundboard without interrupting Miko Music's engine.
+                • <b>Discord Queue Pagination:</b> Clicking <b>📋 Queue</b> in Discord now renders interactive pages (<code>|◀</code>, <code>◀</code>, <code>▶</code>, <code>▶|</code>) for full queue navigation.<br>
+                • <b>Move via Discord:</b> Click <b>↕️ Move</b> on the Discord panel to open a quick modal and change track orders on the fly.<br>
+                • <b>Self-Cleaning Messages:</b> All interaction responses are Discord Ephemerals ("Only you can see this") and auto-purge when Discord restarts.
             </div>
         </div>
     </div>
@@ -241,36 +243,56 @@
     <script>
         let cachedPlaylists = [], isFirstLoad = true, draggedIndex = null, isMuted = false, preMuteVol = 100, currentQueueState = { current: null, tracks: [] };
 
+        function getActiveGuildId() { return document.getElementById('guildSelector').value; }
+
         function switchTab(id) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); document.querySelector(`.tab-btn[onclick="switchTab('${id}')"]`).classList.add('active'); document.getElementById(`tab-${id}`).classList.add('active'); }
         function toggleAccordion(id) { document.getElementById(id).classList.toggle('open'); }
         function escapeHTML(str) { return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag])); }
 
+        function switchGuildContext() { loadChannels(); refreshQueue(); }
+
         function loadConfig() {
-            fetch('/api/server-info').then(r => r.json()).then(data => document.getElementById('serverBadge').innerText = `📡 Active Server: ${data.serverName}`);
-            fetch('/api/channels').then(r => r.json()).then(channels => {
+            fetch('/api/server-info').then(r => r.json()).then(data => {
+                document.getElementById('hostBadge').innerText = data.hostName;
+                document.getElementById('systemTimeLabel').innerText = data.systemTime;
+                const gSelect = document.getElementById('guildSelector');
+                gSelect.innerHTML = '';
+                (data.guilds || []).forEach(g => { gSelect.innerHTML += `<option value="${g.id}">${g.name}</option>`; });
+                loadChannels();
+            });
+
+            fetch('/api/config').then(r => r.json()).then(data => {
+                if (data.dashboardName) document.getElementById('dashTitle').innerText = data.dashboardName;
+                if (data.logRetentionDays) document.getElementById('logRetentionDays').value = data.logRetentionDays;
+                if (data.logLevel) document.getElementById('logLevel').value = data.logLevel;
+                if (data.logDirectory) document.getElementById('logDirectory').value = data.logDirectory;
+                if (data.logBackupSchedule) document.getElementById('logBackupSchedule').value = data.logBackupSchedule;
+                if (data.autoHideMessages) document.getElementById('autoHideMessages').checked = true;
+                if (data.spotifyClientId) document.getElementById('spotifyClientId').value = data.spotifyClientId;
+                if (data.spotifyClientSecret) document.getElementById('spotifyClientSecret').value = data.spotifyClientSecret;
+                cachedPlaylists = data.savedPlaylists || []; 
+                renderPlaylists();
+            });
+            refreshQueue(); 
+            fetchLogs();
+        }
+
+        function loadChannels() {
+            const guildId = getActiveGuildId();
+            fetch(`/api/channels?guildId=${guildId}`).then(r => r.json()).then(channels => {
                 const panel = document.getElementById('panelChannelId'), log = document.getElementById('logChannelId');
                 panel.innerHTML = '<option value="">-- No Restriction --</option>'; log.innerHTML = '<option value="">-- Do Not Send Logs --</option>';
-                channels.forEach(c => { panel.innerHTML += `<option value="${c.id}">#${c.name}</option>`; log.innerHTML += `<option value="${c.id}">#${c.name}</option>`; });
+                channels.forEach(c => { panel.innerHTML += `<option value="${c.id}">${c.name}</option>`; log.innerHTML += `<option value="${c.id}">${c.name}</option>`; });
                 fetch('/api/config').then(r => r.json()).then(data => {
-                    if (data.dashboardName) document.getElementById('dashTitle').innerText = data.dashboardName;
                     if (data.panelChannelId) panel.value = data.panelChannelId;
                     if (data.logChannelId) log.value = data.logChannelId;
-                    if (data.logRetentionDays) document.getElementById('logRetentionDays').value = data.logRetentionDays;
-                    if (data.logLevel) document.getElementById('logLevel').value = data.logLevel;
-                    if (data.logDirectory) document.getElementById('logDirectory').value = data.logDirectory;
-                    if (data.logBackupSchedule) document.getElementById('logBackupSchedule').value = data.logBackupSchedule;
-                    if (data.autoHideMessages) document.getElementById('autoHideMessages').checked = true;
-                    if (data.spotifyClientId) document.getElementById('spotifyClientId').value = data.spotifyClientId;
-                    if (data.spotifyClientSecret) document.getElementById('spotifyClientSecret').value = data.spotifyClientSecret;
-                    cachedPlaylists = data.savedPlaylists || []; renderPlaylists();
                 });
             });
-            fetch('/api/voice-channels').then(r => r.json()).then(channels => {
+            fetch(`/api/voice-channels?guildId=${guildId}`).then(r => r.json()).then(channels => {
                 const vcSelect = document.getElementById('voiceChannelSelect');
                 vcSelect.innerHTML = '<option value="">-- Select Voice Channel --</option>';
-                channels.forEach(c => vcSelect.innerHTML += `<option value="${c.id}">🔊 ${c.name}</option>`);
+                channels.forEach(c => vcSelect.innerHTML += `<option value="${c.id}">${c.name}</option>`);
             });
-            refreshQueue(); fetchLogs();
         }
 
         function fetchLogs() { fetch('/api/logs').then(r => r.json()).then(data => { const b = document.getElementById('terminalBox'); b.innerText = data.logs || "Log file empty."; b.scrollTop = b.scrollHeight; }); }
@@ -284,10 +306,11 @@
             })}).then(() => alert(`Tool settings saved successfully!`));
         }
 
-        function restartService() { if (confirm("Restart the Miko Music Bot Windows Service now? Audio will disconnect for 5-10 seconds.")) fetch('/api/system/restart', { method: 'POST' }).then(() => alert('Restart command issued. The dashboard will reconnect shortly.')); }
+        function restartService() { if (confirm("Restart the Miko Music Bot service now? Audio will disconnect for 5-10 seconds.")) fetch('/api/system/restart', { method: 'POST' }).then(() => alert('Restart command issued.')); }
 
         function refreshQueue() {
-            fetch('/api/queue').then(r => r.json()).then(data => {
+            const guildId = getActiveGuildId();
+            fetch(`/api/queue?guildId=${guildId}`).then(r => r.json()).then(data => {
                 currentQueueState = data;
                 document.getElementById('activeNowPlaying').innerText = data.current ? `▶️ Now Playing: ${data.current}` : '▶️ Nothing Playing';
                 const qc = document.getElementById('queueContainer');
@@ -315,39 +338,63 @@
                 item.addEventListener('dragstart', (e) => { draggedIndex = parseInt(item.getAttribute('data-index')); item.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
                 item.addEventListener('dragend', () => item.classList.remove('dragging'));
                 item.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
-                item.addEventListener('drop', (e) => { e.preventDefault(); const targetIndex = parseInt(item.getAttribute('data-index')); if (draggedIndex && targetIndex && draggedIndex !== targetIndex) moveTrackApi(draggedIndex, targetIndex); });
+                item.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const targetIndex = parseInt(item.getAttribute('data-index'));
+                    if (draggedIndex && targetIndex && draggedIndex !== targetIndex) moveTrackApi(draggedIndex, targetIndex);
+                });
             });
         }
 
-        function removeTrackApi(index) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'remove', index }) }).then(() => refreshQueue()); }
-        function moveTrackApi(from, to) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move', from, to }) }).then(() => refreshQueue()); }
+        function removeTrackApi(index) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'remove', index, guildId: getActiveGuildId() }) }).then(() => refreshQueue()); }
+        function moveTrackApi(from, to) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move', from, to, guildId: getActiveGuildId() }) }).then(() => refreshQueue()); }
         function manualMoveTrack() { const f = document.getElementById('moveFrom').value, t = document.getElementById('moveTo').value; if (!f || !t) return; moveTrackApi(parseInt(f), parseInt(t)); document.getElementById('moveFrom').value = ''; document.getElementById('moveTo').value = ''; }
 
         setInterval(refreshQueue, 3500); setInterval(fetchLogs, 5000);
 
         function editDashName() { const n = prompt("Enter new dashboard name:", document.getElementById('dashTitle').innerText); if (n && n.trim() !== '') fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dashboardName: n.trim() }) }).then(() => document.getElementById('dashTitle').innerText = n.trim()); }
-        function manageVoice(action) { const channelId = document.getElementById('voiceChannelSelect').value; fetch('/api/voice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, channelId }) }).then(r => r.json()).then(res => { if(!res.success) alert(res.message); }); }
+        function manageVoice(action) { const channelId = document.getElementById('voiceChannelSelect').value; fetch('/api/voice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, channelId, guildId: getActiveGuildId() }) }).then(r => r.json()).then(res => { if(!res.success) alert(res.message); }); }
         
         function toggleMute() { const s = document.getElementById('volSlider'); if (isMuted) { isMuted = false; s.value = preMuteVol; document.getElementById('muteToggleBtn').innerText = '🔊'; } else { isMuted = true; preMuteVol = s.value == 0 ? 100 : s.value; s.value = 0; document.getElementById('muteToggleBtn').innerText = '🔇'; } setVolume(); }
-        function setVolume() { const v = document.getElementById('volSlider').value; document.getElementById('volLabel').innerText = v; if (v > 0 && isMuted) { isMuted = false; document.getElementById('muteToggleBtn').innerText = '🔊'; } else if (v == 0 && !isMuted) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; } fetch('/api/volume', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ volume: v }) }); }
+        function setVolume() { const v = document.getElementById('volSlider').value; document.getElementById('volLabel').innerText = v; if (v > 0 && isMuted) { isMuted = false; document.getElementById('muteToggleBtn').innerText = '🔊'; } else if (v == 0 && !isMuted) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; } fetch('/api/volume', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ volume: v, guildId: getActiveGuildId() }) }); }
+
+        async function directLoadPlaylist(url) {
+            if (confirm("Clear active queue and stream this playlist now?")) {
+                await fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop', guildId: getActiveGuildId() }) });
+                await new Promise(r => setTimeout(r, 400));
+                fetch('/api/play', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: url, guildId: getActiveGuildId() }) }).then(() => { refreshQueue(); fetchLogs(); });
+            }
+        }
 
         async function remotePlay() {
             const q = document.getElementById('remotePlayInput').value.trim(); if (!q) return;
-            const cq = q.toLowerCase(); const isM = cachedPlaylists.some(pl => pl.shortcode && pl.shortcode.toLowerCase() === cq); const isP = q.includes('playlist') || q.includes('list=') || q.includes('/album/');
-            if ((isM || isP) && (currentQueueState.current || currentQueueState.tracks.length > 0)) {
-                if (!confirm("⚠️ Music is currently active!\n\nLoading a full playlist on top will append it. Click OK to clear the current queue first, or Cancel to abort.")) return;
-                await fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop' }) }); await new Promise(r => setTimeout(r, 400));
-            }
-            fetch('/api/play', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q }) }).then(r => r.json()).then(res => { if (!res.success) alert(res.message); else { document.getElementById('remotePlayInput').value = ''; refreshQueue(); fetchLogs(); } });
+            fetch('/api/play', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q, guildId: getActiveGuildId() }) }).then(r => r.json()).then(res => { if (!res.success) alert(res.message); else { document.getElementById('remotePlayInput').value = ''; refreshQueue(); fetchLogs(); } });
         }
 
         function syncPlaylistsFromDOM() { const s = []; for (let i = 0; i < cachedPlaylists.length; i++) { s.push({ name: document.getElementById(`pl-name-${i}`)?.value ?? cachedPlaylists[i]?.name ?? '', shortcode: document.getElementById(`pl-code-${i}`)?.value ?? cachedPlaylists[i]?.shortcode ?? '', url: document.getElementById(`pl-url-${i}`)?.value ?? cachedPlaylists[i]?.url ?? '' }); } cachedPlaylists = s; }
-        function renderPlaylists() { const c = document.getElementById('plContainer'); c.innerHTML = ''; cachedPlaylists.forEach((pl, i) => { c.innerHTML += `<div class="pl-item"><input type="text" value="${pl.name || ''}" id="pl-name-${i}" placeholder="Playlist Name" oninput="syncPlaylistsFromDOM()"><input type="text" value="${pl.shortcode || ''}" id="pl-code-${i}" placeholder="Shortcode" oninput="syncPlaylistsFromDOM()"><input type="text" value="${pl.url || ''}" id="pl-url-${i}" placeholder="URL" oninput="syncPlaylistsFromDOM()"><button class="btn-danger" onclick="removePlaylistRow(${i})">✕</button></div>`; }); }
+        
+        function renderPlaylists() {
+            const c = document.getElementById('plContainer'); c.innerHTML = '';
+            cachedPlaylists.forEach((pl, i) => {
+                const tag = (pl.url || '').includes('spotify') ? '🟢' : '🔴';
+                c.innerHTML += `
+                    <div class="pl-item">
+                        <span title="${tag === '🟢' ? 'Spotify' : 'YouTube'}">${tag}</span>
+                        <input type="text" value="${pl.name || ''}" id="pl-name-${i}" placeholder="Name" oninput="syncPlaylistsFromDOM()">
+                        <input type="text" value="${pl.shortcode || ''}" id="pl-code-${i}" placeholder="Code" oninput="syncPlaylistsFromDOM()">
+                        <input type="text" value="${pl.url || ''}" id="pl-url-${i}" placeholder="URL" oninput="syncPlaylistsFromDOM()">
+                        <button class="btn-success" onclick="directLoadPlaylist('${escapeHTML(pl.url || '')}')">▶ Load</button>
+                        <button class="btn-secondary" onclick="window.open('${escapeHTML(pl.url || '')}', '_blank')" title="Manage on source">🔗</button>
+                        <button class="btn-danger" onclick="removePlaylistRow(${i})">✕</button>
+                    </div>`;
+            });
+        }
+
         function addEmptyPlaylistRow() { syncPlaylistsFromDOM(); cachedPlaylists.push({ name: '', shortcode: '', url: '' }); renderPlaylists(); }
         function removePlaylistRow(i) { syncPlaylistsFromDOM(); cachedPlaylists.splice(i, 1); renderPlaylists(); }
         function savePlaylists() { syncPlaylistsFromDOM(); const np = []; for (let i = 0; i < cachedPlaylists.length; i++) { const n = cachedPlaylists[i].name?.trim(), c = (cachedPlaylists[i].shortcode || '').toLowerCase().trim(), u = cachedPlaylists[i].url?.trim(); if (n && u) np.push({ name: n, shortcode: c, url: u }); } fetch('/api/playlists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playlists: np }) }).then(() => { alert('Playlists saved successfully!'); loadConfig(); }); }
         function openDiscordInvite() { fetch('/api/config').then(r => r.json()).then(data => { const id = data.clientId || prompt("Paste your Application ID:"); if (id) window.open(`https://discord.com/oauth2/authorize?client_id=${id}&permissions=3148800&scope=bot%20applications.commands`, 'popup', 'width=500,height=750'); }); }
-        function controlPlayer(action) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) }).then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); fetchLogs(); }); }
+        function controlPlayer(action) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, guildId: getActiveGuildId() }) }).then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); fetchLogs(); }); }
 
         loadConfig();
     </script>

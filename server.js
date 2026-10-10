@@ -12,7 +12,14 @@ function startServer(client) {
     app.use(express.json());
     app.use(express.static('public'));
 
-    app.get('/api/server-info', (req, res) => res.json({ serverName: process.env.COMPUTERNAME || 'MikoHome' }));
+    app.get('/api/server-info', (req, res) => {
+        const guilds = client.guilds.cache.map(g => ({ id: g.id, name: g.name }));
+        res.json({ 
+            hostName: process.env.COMPUTERNAME || 'MIKOHOME',
+            guilds: guilds,
+            systemTime: new Date().toLocaleTimeString()
+        });
+    });
 
     app.get('/api/config', (req, res) => {
         const config = getConfig();
@@ -33,14 +40,22 @@ function startServer(client) {
     });
 
     app.get('/api/channels', (req, res) => {
+        const guildId = req.query.guildId;
+        const targetGuilds = guildId ? client.guilds.cache.filter(g => g.id === guildId) : client.guilds.cache;
         const channels = [];
-        client.guilds.cache.forEach(g => g.channels.cache.filter(c => c.isTextBased()).forEach(c => channels.push({ id: c.id, name: `${g.name} - ${c.name}` })));
+        targetGuilds.forEach(g => {
+            g.channels.cache.filter(c => c.isTextBased()).forEach(c => channels.push({ id: c.id, name: `${g.name} - #${c.name}` }));
+        });
         res.json(channels);
     });
 
     app.get('/api/voice-channels', (req, res) => {
+        const guildId = req.query.guildId;
+        const targetGuilds = guildId ? client.guilds.cache.filter(g => g.id === guildId) : client.guilds.cache;
         const channels = [];
-        client.guilds.cache.forEach(g => g.channels.cache.filter(c => c.isVoiceBased()).forEach(c => channels.push({ id: c.id, name: `${g.name} - ${c.name}` })));
+        targetGuilds.forEach(g => {
+            g.channels.cache.filter(c => c.isVoiceBased()).forEach(c => channels.push({ id: c.id, name: `${g.name} - 🔊 ${c.name}` }));
+        });
         res.json(channels);
     });
 
@@ -67,15 +82,20 @@ function startServer(client) {
         res.json({ success: true });
     });
 
+    function getTargetQueue(guildId) {
+        if (guildId && client.player.nodes.has(guildId)) return client.player.nodes.get(guildId);
+        return client.player.nodes.cache.first();
+    }
+
     app.get('/api/queue', (req, res) => {
-        const queue = client.player.nodes.cache.first();
+        const queue = getTargetQueue(req.query.guildId);
         if (!queue) return res.json({ current: null, tracks: [], volume: 100 });
         const tracks = queue.tracks.toArray().map((t, i) => ({ title: t.title, author: t.author, duration: t.duration, url: t.url, index: i + 1 }));
         res.json({ current: queue.currentTrack ? queue.currentTrack.title : null, tracks, volume: queue.node.volume });
     });
 
     app.post('/api/play', async (req, res) => {
-        let { query } = req.body;
+        let { query, guildId } = req.body;
         if (!query) return res.json({ success: false, message: 'No query provided' });
         
         const config = getConfig();
@@ -85,25 +105,28 @@ function startServer(client) {
         if (matchedMacro) query = matchedMacro.url;
 
         let vc = null, txt = null;
-        client.guilds.cache.forEach(g => {
+        const targetGuilds = guildId ? client.guilds.cache.filter(g => g.id === guildId) : client.guilds.cache;
+        targetGuilds.forEach(g => {
             const member = g.members.cache.get(client.user.id);
             if (member && member.voice.channel) vc = member.voice.channel;
             if (config.panelChannelId && g.channels.cache.has(config.panelChannelId)) txt = g.channels.cache.get(config.panelChannelId);
         });
 
-        if (!vc) return res.json({ success: false, message: 'Bot is not in a voice channel. Use the summon button first.' });
+        if (!vc) return res.json({ success: false, message: 'Bot is not in a voice channel on the selected server.' });
         if (!txt) txt = vc.guild.channels.cache.filter(c => c.isTextBased()).first();
 
         try {
             const existingQueue = client.player.nodes.get(vc.guild.id);
             const panelMsg = existingQueue && existingQueue.metadata ? existingQueue.metadata.panelMessage : null;
-            await client.player.play(vc, query, { nodeOptions: { metadata: { channel: txt, panelMessage: panelMsg }, leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false, bufferingTimeout: 0 } });
+            await client.player.play(vc, query, { 
+                nodeOptions: { metadata: { channel: txt, panelMessage: panelMsg }, leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false, bufferingTimeout: 0 } 
+            });
             res.json({ success: true });
         } catch (e) { res.json({ success: false, message: e.message }); }
     });
 
     app.post('/api/control', (req, res) => {
-        const queue = client.player.nodes.cache.first();
+        const queue = getTargetQueue(req.body.guildId);
         if (!queue) return res.json({ success: false, message: 'Nothing playing' });
         
         try {
@@ -136,7 +159,7 @@ function startServer(client) {
     });
 
     app.post('/api/volume', (req, res) => {
-        const queue = client.player.nodes.cache.first();
+        const queue = getTargetQueue(req.body.guildId);
         if (queue && req.body.volume !== undefined) queue.node.setVolume(parseInt(req.body.volume));
         res.json({ success: true });
     });
@@ -144,7 +167,7 @@ function startServer(client) {
     app.post('/api/voice', async (req, res) => {
         const { action, channelId } = req.body;
         if (action === 'disconnect') {
-            const queue = client.player.nodes.cache.first();
+            const queue = getTargetQueue(req.body.guildId);
             if (queue) queue.delete();
             return res.json({ success: true });
         }
