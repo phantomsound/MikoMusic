@@ -18,6 +18,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const http = require('http');
 const { exec } = require('child_process');
 const logger = require('./logger');
 
@@ -409,7 +410,7 @@ async function deployControlPanel(guild, voiceChannel, targetTextChannel, intera
     queue.metadata.panelMessage = msg;
     updatePanel(queue);
     if (interaction && !interaction.replied) {
-        await interaction.followUp({ content: '✅ Command Center activated.', flags: [64] }).catch(() => {});
+        await replyEphemeralAutoDismiss(interaction, '✅ Command Center activated.', 4000);
     }
 }
 
@@ -445,13 +446,13 @@ async function handlePlayback(voiceChannel, rawQuery, interaction = null, textCh
         updatePanel(queue);
         const title = track.playlist ? track.playlist.title : track.title;
         if (interaction) {
-            await interaction.followUp({ content: `✅ Loaded: **${title}**`, flags: [64] }).catch(() => {});
+            await replyEphemeralAutoDismiss(interaction, `✅ Loaded: **${title}**`, 4000);
         }
         return { success: true, title };
     } catch (err) {
         logger.error(`Playback Error: ${err.message}`);
         if (interaction) {
-            await interaction.followUp({ content: `❌ Playback Error: ${err.message}`, flags: [64] }).catch(() => {});
+            await replyEphemeralAutoDismiss(interaction, `❌ Playback Error: ${err.message}`, 4000);
         }
         throw err;
     }
@@ -475,11 +476,13 @@ player.events.on('audioTrackRemove', (queue) => updatePanel(queue));
 player.events.on('emptyQueue', (queue) => {
     updatePanel(queue);
     logger.checkDeferredRotation();
+    executeChannelPurge('queue finished');
 });
 player.events.on('disconnect', (queue) => {
     updatePanel(queue);
     ensureStandbyBanner(client);
     logger.checkDeferredRotation();
+    executeChannelPurge('bot disconnected');
 });
 player.events.on('volumeChange', (queue) => updatePanel(queue));
 
@@ -494,6 +497,27 @@ client.once('clientReady', async () => {
     await ensureStandbyBanner(client);
 });
 
+// Ephemeral Auto-Dismiss Helper (automatically deletes confirmation popups so they do not clutter chat)
+async function replyEphemeralAutoDismiss(interaction, content, delayMs = 4000) {
+    if (!interaction) return;
+    try {
+        if (interaction.deferred || interaction.replied) {
+            const follow = await interaction.followUp({ content, flags: [64] }).catch(() => null);
+            setTimeout(() => {
+                follow?.delete?.().catch(() => {});
+                interaction.deleteReply().catch(() => {});
+            }, delayMs);
+            return follow;
+        } else {
+            const rep = await interaction.reply({ content, flags: [64] }).catch(() => null);
+            setTimeout(() => {
+                interaction.deleteReply().catch(() => {});
+            }, delayMs);
+            return rep;
+        }
+    } catch (e) {}
+}
+
 // Client Interactions
 client.on('interactionCreate', async interaction => {
     try {
@@ -506,23 +530,64 @@ client.on('interactionCreate', async interaction => {
 
         if (interaction.isButton()) {
             if (interaction.customId === 'btn_sfx_summon') {
-                return interaction.deferUpdate().catch(() => {});
+                const channel = interaction.member?.voice?.channel;
+                if (!channel) {
+                    return replyEphemeralAutoDismiss(interaction, '❌ You must be in a Voice Channel to summon SFX Bot!', 4000);
+                }
+                await interaction.deferReply({ flags: [64] }).catch(() => {});
+                try {
+                    const postData = JSON.stringify({ action: 'join', channelId: channel.id, guildId: interaction.guild.id });
+                    const sfxReq = http.request({
+                        hostname: '127.0.0.1',
+                        port: 3001,
+                        path: '/api/voice',
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Content-Length': Buffer.byteLength(postData)
+                        },
+                        timeout: 3000
+                    }, (res) => {
+                        let data = '';
+                        res.on('data', chunk => { data += chunk; });
+                        res.on('end', () => {
+                            try {
+                                const parsed = JSON.parse(data);
+                                if (parsed.success) {
+                                    replyEphemeralAutoDismiss(interaction, `✅ SFX Bot joined **${channel.name}**!`, 4000);
+                                } else {
+                                    replyEphemeralAutoDismiss(interaction, `❌ SFX Bot: ${parsed.message || 'Could not join'}`, 4000);
+                                }
+                            } catch (e) {
+                                replyEphemeralAutoDismiss(interaction, `✅ SFX Bot summon signal sent!`, 4000);
+                            }
+                        });
+                    });
+                    sfxReq.on('error', () => {
+                        replyEphemeralAutoDismiss(interaction, '⚠️ SFX Bot is offline or unreachable on port 3001.', 4000);
+                    });
+                    sfxReq.write(postData);
+                    sfxReq.end();
+                } catch (err) {
+                    replyEphemeralAutoDismiss(interaction, `❌ Failed to summon SFX Bot: ${err.message}`, 4000);
+                }
+                return;
             }
 
             if (interaction.customId === 'btn_summon_standby') {
                 const channel = interaction.member?.voice?.channel;
                 if (!channel) {
-                    return interaction.reply({ content: '❌ You must be in a Voice Channel to summon the bot!', flags: [64] });
+                    return replyEphemeralAutoDismiss(interaction, '❌ You must be in a Voice Channel to summon the bot!', 4000);
                 }
                 await interaction.deferReply({ flags: [64] });
                 await deployControlPanel(interaction.guild, channel, interaction.channel, interaction);
-                return interaction.followUp({ content: `✅ Connected to **${channel.name}**!`, flags: [64] });
+                return replyEphemeralAutoDismiss(interaction, `✅ Connected to **${channel.name}**!`, 4000);
             }
 
             const queue = player.nodes.get(interaction.guildId);
 
             if (interaction.customId.startsWith('btn_qp_')) {
-                if (!queue) return interaction.reply({ content: 'Queue is empty.', flags: [64] });
+                if (!queue) return replyEphemeralAutoDismiss(interaction, 'Queue is empty.', 4000);
                 const parts = interaction.customId.split('_');
                 const page = parseInt(parts[3]) || 1;
                 const totalPages = Math.ceil(queue.tracks.size / 5) || 1;
@@ -536,9 +601,11 @@ client.on('interactionCreate', async interaction => {
 
             if (interaction.customId === 'btn_queue') {
                 if (!queue || (!queue.currentTrack && queue.isEmpty())) {
-                    return interaction.reply({ content: 'Queue is empty.', flags: [64] });
+                    return replyEphemeralAutoDismiss(interaction, 'Queue is empty.', 4000);
                 }
-                return interaction.reply({ ...renderQueueEmbed(queue, 1), flags: [64] });
+                await interaction.reply({ ...renderQueueEmbed(queue, 1), flags: [64] });
+                setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 30000);
+                return;
             }
 
             if (interaction.customId === 'btn_move_modal') {
@@ -557,7 +624,7 @@ client.on('interactionCreate', async interaction => {
             if (interaction.customId === 'btn_playlists') {
                 const config = getConfig();
                 if (!config.savedPlaylists || !config.savedPlaylists.length) {
-                    return interaction.reply({ content: 'No playlists configured.', flags: [64] });
+                    return replyEphemeralAutoDismiss(interaction, 'No playlists configured.', 4000);
                 }
                 const menu = new StringSelectMenuBuilder().setCustomId('menu_playlist').setPlaceholder('Select a playlist');
                 config.savedPlaylists.slice(0, 25).forEach((pl, index) => {
@@ -567,60 +634,67 @@ client.on('interactionCreate', async interaction => {
                         description: (pl.shortcode ? `Shortcode: ${pl.shortcode}` : '').substring(0, 50) || undefined
                     });
                 });
-                return interaction.reply({ components: [new ActionRowBuilder().addComponents(menu)], flags: [64] });
+                await interaction.reply({ components: [new ActionRowBuilder().addComponents(menu)], flags: [64] });
+                setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 30000);
+                return;
             }
 
-            if (!queue) return interaction.reply({ content: 'Nothing playing.', flags: [64] });
+            if (interaction.customId === 'btn_stop') {
+                if (queue) {
+                    queue.node.setPaused(false);
+                    queue.tracks.clear();
+                    queue.node.skip();
+                    updatePanel(queue);
+                }
+                await replyEphemeralAutoDismiss(interaction, '⏹️ Cleared queue & channel logs.', 3000);
+                executeChannelPurge('clear queue');
+                return;
+            }
+
+            if (!queue) return replyEphemeralAutoDismiss(interaction, 'Nothing playing.', 3000);
 
             if (interaction.customId === 'btn_pause') {
                 queue.node.setPaused(!queue.node.isPaused());
-                await interaction.reply({ content: '⏯️ Toggled playback.', flags: [64] });
+                await replyEphemeralAutoDismiss(interaction, queue.node.isPaused() ? '⏸️ Paused playback.' : '▶️ Resumed playback.', 3000);
                 updatePanel(queue);
             }
             if (interaction.customId === 'btn_skip') {
                 queue.node.skip();
-                await interaction.reply({ content: '⏭️ Skipped track.', flags: [64] });
-            }
-            if (interaction.customId === 'btn_stop') {
-                queue.node.setPaused(false);
-                queue.tracks.clear();
-                queue.node.skip();
-                await interaction.reply({ content: '⏹️ Cleared queue.', flags: [64] });
-                updatePanel(queue);
+                await replyEphemeralAutoDismiss(interaction, '⏭️ Skipped track.', 3000);
             }
             if (interaction.customId === 'btn_back') {
                 if (queue.history && queue.history.previousTrack) {
                     await queue.history.previous();
-                    await interaction.reply({ content: '⏮️ Returning to previous track.', flags: [64] });
+                    await replyEphemeralAutoDismiss(interaction, '⏮️ Returning to previous track.', 3000);
                 } else {
-                    await interaction.reply({ content: '⏮️ No previous track history.', flags: [64] });
+                    await replyEphemeralAutoDismiss(interaction, '⏮️ No previous track history.', 3000);
                 }
             }
             if (interaction.customId === 'btn_shuffle') {
                 queue.tracks.shuffle();
-                await interaction.reply({ content: '🔀 Queue shuffled.', flags: [64] });
+                await replyEphemeralAutoDismiss(interaction, '🔀 Queue shuffled.', 3000);
                 updatePanel(queue);
             }
             if (interaction.customId === 'btn_loop_track') {
                 queue.setRepeatMode(QueueRepeatMode.TRACK);
-                await interaction.reply({ content: '🔂 Looping single track.', flags: [64] });
+                await replyEphemeralAutoDismiss(interaction, '🔂 Looping single track.', 3000);
                 updatePanel(queue);
             }
             if (interaction.customId === 'btn_loop_queue') {
                 queue.setRepeatMode(QueueRepeatMode.QUEUE);
-                await interaction.reply({ content: '🔁 Looping full queue.', flags: [64] });
+                await replyEphemeralAutoDismiss(interaction, '🔁 Looping full queue.', 3000);
                 updatePanel(queue);
             }
             if (interaction.customId === 'btn_loop_off') {
                 queue.setRepeatMode(QueueRepeatMode.OFF);
-                await interaction.reply({ content: '❌ Loop disabled.', flags: [64] });
+                await replyEphemeralAutoDismiss(interaction, '❌ Loop disabled.', 3000);
                 updatePanel(queue);
             }
         }
 
         if (interaction.isModalSubmit() && interaction.customId === 'modal_move_track') {
             const queue = player.nodes.get(interaction.guildId);
-            if (!queue) return interaction.reply({ content: 'Nothing in queue.', flags: [64] });
+            if (!queue) return replyEphemeralAutoDismiss(interaction, 'Nothing in queue.', 3000);
             const fromIdx = parseInt(interaction.fields.getTextInputValue('move_from')) - 1;
             const toIdx = parseInt(interaction.fields.getTextInputValue('move_to')) - 1;
             const tracks = queue.tracks.toArray();
@@ -628,10 +702,10 @@ client.on('interactionCreate', async interaction => {
                 const t = tracks[fromIdx];
                 queue.node.remove(t);
                 queue.node.insert(t, toIdx);
-                await interaction.reply({ content: `✅ Moved **${t.title}** to #${toIdx + 1}`, flags: [64] });
+                await replyEphemeralAutoDismiss(interaction, `✅ Moved **${t.title}** to #${toIdx + 1}`, 3000);
                 updatePanel(queue);
             } else {
-                await interaction.reply({ content: '❌ Invalid track numbers.', flags: [64] });
+                await replyEphemeralAutoDismiss(interaction, '❌ Invalid track numbers.', 3000);
             }
         }
 
@@ -641,7 +715,7 @@ client.on('interactionCreate', async interaction => {
             const config = getConfig();
             const playlist = config.savedPlaylists[selectedIdx];
             if (!playlist || !playlist.url) {
-                return interaction.followUp({ content: '❌ Playlist URL not found.', flags: [64] });
+                return replyEphemeralAutoDismiss(interaction, '❌ Playlist URL not found.', 3000);
             }
 
             let voiceChannel = interaction.member?.voice?.channel;
@@ -653,7 +727,7 @@ client.on('interactionCreate', async interaction => {
             }
 
             if (!voiceChannel) {
-                return interaction.followUp({ content: '❌ You must be in a Voice Channel to start playback.', flags: [64] });
+                return replyEphemeralAutoDismiss(interaction, '❌ You must be in a Voice Channel to start playback.', 4000);
             }
 
             const queue = player.nodes.get(interaction.guildId);
@@ -998,17 +1072,25 @@ app.post('/api/play', async (req, res) => {
 
 app.post('/api/control', (req, res) => {
     const queue = req.body.guildId ? client.player?.nodes?.get(req.body.guildId) : client.player?.nodes?.cache?.first();
+    const act = req.body.action;
+
+    if (act === 'stop') {
+        if (queue) {
+            queue.node.setPaused(false);
+            queue.tracks.clear();
+            queue.node.skip();
+            updatePanel(queue);
+        }
+        executeChannelPurge('clear queue');
+        return res.json({ success: true, message: 'Queue cleared and messages purged' });
+    }
+
     if (!queue) return res.json({ success: false, message: 'Nothing playing' });
 
     try {
-        const act = req.body.action;
         if (act === 'pause') {
             queue.node.setPaused(!queue.node.isPaused());
         } else if (act === 'skip') {
-            queue.node.skip();
-        } else if (act === 'stop') {
-            queue.node.setPaused(false);
-            queue.tracks.clear();
             queue.node.skip();
         } else if (act === 'back') {
             if (queue.history && queue.history.previousTrack) queue.history.previous();
