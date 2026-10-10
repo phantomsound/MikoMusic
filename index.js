@@ -580,6 +580,9 @@ async function startDiscordBot() {
             }
         }
 
+        if (client.isReady()) {
+            try { await client.destroy(); } catch (e) {}
+        }
         await client.login(token);
     } catch (err) {
         logger.error(`Discord Login Failed: ${err.message}`);
@@ -588,6 +591,10 @@ async function startDiscordBot() {
             rateLimitMessage = err.message;
             if (reconnectTimer) clearTimeout(reconnectTimer);
             reconnectTimer = setTimeout(startDiscordBot, 60000 * 15); // Retry in 15 mins
+        } else if (err.message && (err.message.includes('token') || err.message.includes('TOKEN'))) {
+            botStatus = 'invalid_token';
+            rateLimitMessage = 'Invalid Discord token. Please update the token in .env or the web dashboard.';
+            if (reconnectTimer) clearTimeout(reconnectTimer);
         } else {
             botStatus = 'disconnected';
             if (reconnectTimer) clearTimeout(reconnectTimer);
@@ -673,6 +680,37 @@ app.post('/api/settings', (req, res) => {
     if (req.body.spotifyClientId !== undefined) config.spotifyClientId = req.body.spotifyClientId;
     if (req.body.spotifyClientSecret !== undefined) config.spotifyClientSecret = req.body.spotifyClientSecret;
     saveConfig(config);
+
+    if (req.body.discordToken !== undefined || req.body.clientId !== undefined) {
+        try {
+            const envPath = path.join(__dirname, '.env');
+            let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf-8') : '';
+            if (req.body.discordToken) {
+                const tok = req.body.discordToken.trim();
+                if (envContent.includes('DISCORD_TOKEN=')) {
+                    envContent = envContent.replace(/DISCORD_TOKEN=.*/, `DISCORD_TOKEN=${tok}`);
+                } else {
+                    envContent += `\nDISCORD_TOKEN=${tok}`;
+                }
+                process.env.DISCORD_TOKEN = tok;
+            }
+            if (req.body.clientId) {
+                const cid = req.body.clientId.trim();
+                if (envContent.includes('CLIENT_ID=')) {
+                    envContent = envContent.replace(/CLIENT_ID=.*/, `CLIENT_ID=${cid}`);
+                } else {
+                    envContent += `\nCLIENT_ID=${cid}`;
+                }
+                process.env.CLIENT_ID = cid;
+            }
+            fs.writeFileSync(envPath, envContent.trim() + '\n', 'utf-8');
+            logger.info('Updated .env with new Discord credentials');
+            startDiscordBot();
+        } catch (e) {
+            logger.error(`Failed to update .env: ${e.message}`);
+        }
+    }
+
     res.json({ success: true });
 });
 
@@ -885,12 +923,15 @@ app.get('/api/logs/export', (req, res) => {
 });
 
 app.post('/api/system/restart', (req, res) => {
-    res.json({ success: true, message: 'Restart command dispatched.' });
-    setTimeout(() => {
-        exec('powershell -Command "nssm restart MikoDiscordMusicBot"', (err) => {
-            if (err) process.exit(0);
-        });
-    }, 1000);
+    res.json({ success: true, message: 'Configuration reloaded. Reconnecting...' });
+    try {
+        require('dotenv').config({ override: true });
+        logger.info('🔄 Restart/reload requested. Reconnecting Discord bot...');
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        startDiscordBot();
+    } catch (e) {
+        logger.error(`Restart failed: ${e.message}`);
+    }
 });
 
 // START HTTP SERVER FIRST, THEN CONNECT DISCORD

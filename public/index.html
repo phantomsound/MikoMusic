@@ -156,6 +156,16 @@
     <div id="tab-tools" class="tab-content">
         <div class="grid-layout">
             <div class="card">
+                <h3>Discord Bot Authentication</h3>
+                <span class="help-text">Update your Discord Bot Token or Application ID. Saves directly to .env and connects.</span>
+                <label style="display:block; margin-top:8px; font-weight:600; font-size:0.88rem;">Discord Bot Token:</label>
+                <input type="password" id="discordBotToken" placeholder="Paste new bot token here...">
+                <label style="display:block; margin-top:12px; font-weight:600; font-size:0.88rem;">Application / Client ID:</label>
+                <input type="text" id="discordClientId" placeholder="e.g. 1086412842573504655">
+                <button onclick="saveDiscordAuth()" class="btn-success" style="margin-top: 1rem; width: 100%;">🤖 Save Token &amp; Connect</button>
+            </div>
+
+            <div class="card">
                 <h3>Spotify API Authentication</h3>
                 <span class="help-text">Enter Client ID and Secret to authenticate playlist scrapes. Restart bot to apply changes.</span>
                 <label style="display:block; margin-top:8px; font-weight:600; font-size:0.88rem;">Client ID:</label>
@@ -277,6 +287,8 @@
                         const mins = Math.ceil((data.rateLimitRemaining || 0) / 60);
                         const hrs = (mins / 60).toFixed(1);
                         statusBadge.innerHTML = `<span style="color: var(--yellow);" title="${escapeHTML(data.rateLimitMessage || '')}">🟡 Rate-Limited (Reset: ~${hrs}h)</span>`;
+                    } else if (data.status === 'invalid_token') {
+                        statusBadge.innerHTML = `<span style="color: var(--red);">🔴 Invalid Bot Token (Enter in Tools)</span>`;
                     } else if (data.status === 'connecting') {
                         statusBadge.innerHTML = `<span style="color: var(--blue);">🔵 Connecting...</span>`;
                     } else {
@@ -309,11 +321,30 @@
                 if (data.autoHideMessages) document.getElementById('autoHideMessages').checked = true;
                 if (data.spotifyClientId) document.getElementById('spotifyClientId').value = data.spotifyClientId;
                 if (data.spotifyClientSecret) document.getElementById('spotifyClientSecret').value = data.spotifyClientSecret;
+                if (data.clientId && document.getElementById('discordClientId')) document.getElementById('discordClientId').value = data.clientId;
                 cachedPlaylists = data.savedPlaylists || []; 
                 renderPlaylists();
             });
             refreshQueue(); 
             fetchLogs();
+        }
+
+        function saveDiscordAuth() {
+            const token = document.getElementById('discordBotToken').value.trim();
+            const cid = document.getElementById('discordClientId').value.trim();
+            if (!token && !cid) return alert('Please enter a Discord Bot Token or Application ID.');
+            const payload = {};
+            if (token) payload.discordToken = token;
+            if (cid) payload.clientId = cid;
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(r => r.json()).then(res => {
+                alert('Discord credentials saved! Reconnecting bot...');
+                document.getElementById('discordBotToken').value = '';
+                setTimeout(() => { updateServerInfo(); fetchLogs(); }, 1200);
+            });
         }
 
         function loadChannels() {
