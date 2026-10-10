@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const path = require('path');
 
 const logDir = path.join(__dirname, 'logs');
@@ -87,12 +87,22 @@ function checkDeferredRotation() {
 }
 
 module.exports = {
+    info: (...args) => console.log(...args),
+    warn: (...args) => console.warn(...args),
+    error: (...args) => console.error(...args),
     initLogger: (client) => {
         activeClient = client;
         // Schedule daily check (every 24 hours)
         setInterval(() => {
-            const config = JSON.parse(fs.readFileSync('./config.json', 'utf-8') || '{}');
-            executeRotation(config.logRetentionDays || 7);
+            let retention = 7;
+            try {
+                const cfgPath = path.join(__dirname, 'config.json');
+                if (fs.existsSync(cfgPath)) {
+                    const config = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+                    if (config.logRetentionDays) retention = config.logRetentionDays;
+                }
+            } catch (e) {}
+            executeRotation(retention);
         }, 1000 * 60 * 60 * 24);
     },
     checkDeferredRotation,

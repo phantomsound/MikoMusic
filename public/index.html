@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -58,10 +58,11 @@
                 <h1 id="dashTitle">Miko Music Dashboard</h1>
                 <button onclick="editDashName()" class="btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;">✏️ Rename</button>
             </div>
-            <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px; flex-wrap: wrap;">
                 <span style="color: var(--green); font-size: 0.88rem; font-weight: bold;">🖥️ Host: <span id="hostBadge">MIKOHOME</span></span>
                 <span style="font-size: 0.85rem; color: #a6adc8;">| Active Guild:</span>
                 <select id="guildSelector" onchange="switchGuildContext()" style="width: auto; padding: 2px 8px; font-size: 0.85rem;"></select>
+                <span id="botStatusBadge" style="font-size: 0.85rem; font-weight: bold;"></span>
             </div>
         </div>
         <div style="display: flex; gap: 8px;">
@@ -264,15 +265,40 @@
 
         function switchGuildContext() { loadChannels(); refreshQueue(); }
 
-        function loadConfig() {
+        function updateServerInfo() {
             fetch('/api/server-info').then(r => r.json()).then(data => {
                 document.getElementById('hostBadge').innerText = data.hostName;
                 document.getElementById('systemTimeLabel').innerText = data.systemTime;
+                const statusBadge = document.getElementById('botStatusBadge');
+                if (statusBadge) {
+                    if (data.status === 'online') {
+                        statusBadge.innerHTML = `<span style="color: var(--green);">🟢 Online (${data.botUser || 'Connected'})</span>`;
+                    } else if (data.status === 'rate_limited') {
+                        const mins = Math.ceil((data.rateLimitRemaining || 0) / 60);
+                        const hrs = (mins / 60).toFixed(1);
+                        statusBadge.innerHTML = `<span style="color: var(--yellow);" title="${escapeHTML(data.rateLimitMessage || '')}">🟡 Rate-Limited (Reset: ~${hrs}h)</span>`;
+                    } else if (data.status === 'connecting') {
+                        statusBadge.innerHTML = `<span style="color: var(--blue);">🔵 Connecting...</span>`;
+                    } else {
+                        statusBadge.innerHTML = `<span style="color: var(--red);">🔴 Offline</span>`;
+                    }
+                }
                 const gSelect = document.getElementById('guildSelector');
-                gSelect.innerHTML = '';
-                (data.guilds || []).forEach(g => { gSelect.innerHTML += `<option value="${g.id}">${g.name}</option>`; });
-                loadChannels();
+                const currVal = gSelect.value;
+                const guilds = data.guilds || [];
+                if (guilds.length > 0 && gSelect.options.length !== guilds.length) {
+                    gSelect.innerHTML = '';
+                    guilds.forEach(g => { gSelect.innerHTML += `<option value="${g.id}">${g.name}</option>`; });
+                    if (currVal && guilds.some(g => g.id === currVal)) gSelect.value = currVal;
+                    loadChannels();
+                } else if (guilds.length === 0 && gSelect.options.length === 0) {
+                    gSelect.innerHTML = '<option value="">-- No Connected Servers --</option>';
+                }
             });
+        }
+
+        function loadConfig() {
+            updateServerInfo();
 
             fetch('/api/config').then(r => r.json()).then(data => {
                 if (data.dashboardName) document.getElementById('dashTitle').innerText = data.dashboardName;
@@ -388,7 +414,7 @@
         function moveTrackApi(from, to) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move', from, to, guildId: getActiveGuildId() }) }).then(() => refreshQueue()); }
         function manualMoveTrack() { const f = document.getElementById('moveFrom').value, t = document.getElementById('moveTo').value; if (!f || !t) return; moveTrackApi(parseInt(f), parseInt(t)); document.getElementById('moveFrom').value = ''; document.getElementById('moveTo').value = ''; }
 
-        setInterval(refreshQueue, 3500); setInterval(fetchLogs, 5000);
+        setInterval(refreshQueue, 3500); setInterval(fetchLogs, 5000); setInterval(updateServerInfo, 10000);
 
         function editDashName() { const n = prompt("Enter new dashboard name:", document.getElementById('dashTitle').innerText); if (n && n.trim() !== '') fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dashboardName: n.trim() }) }).then(() => document.getElementById('dashTitle').innerText = n.trim()); }
         function manageVoice(action) { const channelId = document.getElementById('voiceChannelSelect').value; fetch('/api/voice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, channelId, guildId: getActiveGuildId() }) }).then(r => r.json()).then(res => { if(!res.success) alert(res.message); }); }
