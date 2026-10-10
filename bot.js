@@ -98,24 +98,27 @@ function startBot() {
             console.log("Loading Extractor Engines...");
             
             const { DefaultExtractors, SpotifyExtractor } = require('@discord-player/extractor');
-            
-            // THE FIX: Import the exact key revealed by the diagnostic log
             const { YoutubeExtractor } = require('discord-player-youtubei');
+            const config = getConfig();
             
             if (YoutubeExtractor) {
                 if (!YoutubeExtractor.identifier) YoutubeExtractor.identifier = 'com.discord-player.youtubei';
-                
                 await player.extractors.register(YoutubeExtractor, {});
-                console.log(`✅ Android TV Engine Mounted Successfully!`);
                 
-                // Bridge Spotify directly to it
-                await player.extractors.register(SpotifyExtractor, { bridgeProvider: YoutubeExtractor });
+                // THE FIX: Feed dynamic Dashboard config straight into Spotify options
+                const spotifyOpts = { bridgeProvider: YoutubeExtractor };
+                if (config.spotifyClientId && config.spotifyClientSecret) {
+                    spotifyOpts.clientId = config.spotifyClientId;
+                    spotifyOpts.clientSecret = config.spotifyClientSecret;
+                    console.log("✅ Spotify API Credentials securely loaded from Dashboard!");
+                } else {
+                    console.log("⚠️ Spotify API Credentials empty. Using anonymous scraper (may be blocked).");
+                }
+
+                await player.extractors.register(SpotifyExtractor, spotifyOpts);
                 console.log("✅ Spotify explicitly bridged to Android TV Engine");
-            } else {
-                console.error("❌ CRITICAL: YoutubeExtractor export still missing!");
             }
 
-            // Load the rest of the defaults
             const remaining = DefaultExtractors.filter(ext => ext.name !== 'SpotifyExtractor');
             await player.extractors.loadMulti(remaining);
             
@@ -142,13 +145,10 @@ function startBot() {
             metadata: { channel: targetTextChannel, panelMessage: null }, 
             leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false 
         });
-        
         if (!queue.connection) await queue.connect(channel);
-
         if (queue.metadata.panelMessage && queue.metadata.panelMessage.id) {
             try { await queue.metadata.panelMessage.delete(); } catch(e) {}
         }
-
         const embed = new EmbedBuilder().setColor('#89b4fa').setTitle('🎛️ Miko Music Control Panel').setDescription('*Nothing is currently playing. Add a track to begin!*');
         const row1 = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('btn_queue').setLabel('Queue').setStyle(ButtonStyle.Secondary),
@@ -164,13 +164,7 @@ function startBot() {
             new ButtonBuilder().setCustomId('btn_playlists').setLabel('📂 Load Playlist').setStyle(ButtonStyle.Secondary)
         );
 
-        let msg;
-        if (interaction) {
-            msg = await interaction.followUp({ embeds: [embed], components: [row1, row2], fetchReply: true });
-        } else {
-            msg = await targetTextChannel.send({ embeds: [embed], components: [row1, row2] });
-        }
-
+        let msg = interaction ? await interaction.followUp({ embeds: [embed], components: [row1, row2], fetchReply: true }) : await targetTextChannel.send({ embeds: [embed], components: [row1, row2] });
         queue.metadata.panelMessage = msg;
         updatePanel(queue);
     }
@@ -183,7 +177,6 @@ function startBot() {
             let safeQuery = matchedMacro ? matchedMacro.url : rawQuery;
             
             if (safeQuery.includes('music.youtube.com')) safeQuery = safeQuery.replace('music.youtube.com', 'www.youtube.com');
-            
             try { 
                 const u = new URL(safeQuery); 
                 u.searchParams.delete('si'); 
@@ -201,7 +194,6 @@ function startBot() {
                 },
                 requestedBy: interaction.user
             });
-            
             updatePanel(queue);
             const title = track.playlist ? track.playlist.title : track.title;
             const aliasTag = matchedMacro ? ` *(shortcode: ${matchedMacro.shortcode})*` : '';
@@ -245,7 +237,6 @@ function startBot() {
                         queue.node.remove(track);
                         queue.node.insert(track, to);
                     }
-                    
                     await interaction.reply({ content: `✅ Track moved successfully!`, ephemeral: true });
                     updatePanel(queue);
                 }
