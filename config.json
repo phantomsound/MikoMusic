@@ -36,12 +36,53 @@
   "lastVoiceChannelId": "1518424763784101908",
   "history": [
     {
+      "name": "That's Just Beautiful",
+      "time": "05:14:05 PM"
+    },
+    {
+      "name": "Everything Gone",
+      "time": "05:12:11 PM"
+    },
+    {
+      "name": "Lost Tapes",
+      "time": "05:09:34 PM"
+    },
+    {
       "name": "Exoplanet",
-      "time": "04:49:40 PM"
+      "time": "05:07:08 PM"
+    },
+    {
+      "name": "Exoplanet",
+      "time": "05:05:16 PM"
+    },
+    {
+      "name": "Lost Tapes",
+      "time": "05:05:13 PM"
+    },
+    {
+      "name": "I Can't Remember Her Face",
+      "time": "05:05:09 PM"
+    },
+    {
+      "name": "still here",
+      "time": "05:05:04 PM"
+    },
+    {
+      "name": "I Can't Remember Her Face",
+      "time": "05:04:59 PM"
+    },
+    {
+      "name": "Lost Tapes",
+      "time": "05:04:53 PM"
     }
   ],
   "defaultVoiceChannels": {
     "804535377062658059": "1518424763784101908"
   },
-  "defaultVoiceChannelId": "1518424763784101908"
+  "defaultVoiceChannelId": "1518424763784101908",
+  "defaultVolume": 75,
+  "guildVolumes": {
+    "804535377062658059": 75
+  },
+  "autoDismiss": "30s"
 }

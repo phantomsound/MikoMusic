@@ -45,6 +45,25 @@ function saveConfig(cfg) {
     }
 }
 
+function getGuildVolume(guildId) {
+    const config = getConfig();
+    if (guildId && config.guildVolumes && config.guildVolumes[guildId] !== undefined) {
+        return parseInt(config.guildVolumes[guildId]);
+    }
+    if (config.defaultVolume !== undefined) {
+        return parseInt(config.defaultVolume);
+    }
+    return 100;
+}
+
+function saveGuildVolume(guildId, vol) {
+    const config = getConfig();
+    config.defaultVolume = vol;
+    if (!config.guildVolumes) config.guildVolumes = {};
+    if (guildId) config.guildVolumes[guildId] = vol;
+    saveConfig(config);
+}
+
 function logHistory(songName) {
     if (!songName) return;
     const config = getConfig();
@@ -149,12 +168,88 @@ async function logNowPlaying(guild, track, queue) {
                 .setFooter({ text: `Queue Remaining: ${queue.tracks.size} tracks • Vol: ${queue.node.volume}%` })
                 .setTimestamp();
             const msg = await channel.send({ embeds: [embed] });
-            if (config.autoHideMessages) {
+            const dismissMode = config.autoDismiss || (config.autoHideMessages ? '60s' : 'off');
+            if (dismissMode === '15s') {
+                setTimeout(() => { msg.delete().catch(() => {}); }, 15000);
+            } else if (dismissMode === '30s') {
+                setTimeout(() => { msg.delete().catch(() => {}); }, 30000);
+            } else if (dismissMode === '60s') {
                 setTimeout(() => { msg.delete().catch(() => {}); }, 60000);
             }
         }
     } catch (e) {}
 }
+
+async function purgeChannelMessages(channelId, reason = 'scheduled') {
+    if (!channelId || !client.isReady()) return 0;
+    try {
+        const channel = client.channels.cache.get(channelId);
+        if (!channel || !channel.isTextBased()) return 0;
+
+        const msgs = await channel.messages.fetch({ limit: 100 });
+        const toDelete = [];
+        for (const [id, m] of msgs) {
+            if (m.author.id === client.user?.id) {
+                const isStandby = m.embeds[0]?.title?.includes('Standby') || m.embeds[0]?.title?.includes('Hub');
+                const isCommand = m.embeds[0]?.title?.includes('Command Center') || m.embeds[0]?.title?.includes('Control Panel');
+                if (!isStandby && !isCommand) {
+                    toDelete.push(m);
+                }
+            }
+        }
+
+        if (toDelete.length > 0) {
+            const bulkEligible = toDelete.filter(m => (Date.now() - m.createdTimestamp) < 14 * 24 * 60 * 60 * 1000);
+            const individual = toDelete.filter(m => (Date.now() - m.createdTimestamp) >= 14 * 24 * 60 * 60 * 1000);
+
+            if (bulkEligible.length === 1) {
+                await bulkEligible[0].delete().catch(() => {});
+            } else if (bulkEligible.length > 1) {
+                await channel.bulkDelete(bulkEligible, true).catch(async () => {
+                    for (const m of bulkEligible) await m.delete().catch(() => {});
+                });
+            }
+            for (const m of individual) {
+                await m.delete().catch(() => {});
+            }
+            logger.info(`🧹 [${reason.toUpperCase()}] Purged ${toDelete.length} bot log message(s) in #${channel.name}`);
+        }
+        return toDelete.length;
+    } catch (e) {
+        logger.error(`Channel purge error: ${e.message}`);
+        return 0;
+    }
+}
+
+async function executeChannelPurge(reason = 'manual') {
+    const config = getConfig();
+    let totalPurged = 0;
+    if (config.logChannelId) {
+        totalPurged += await purgeChannelMessages(config.logChannelId, reason);
+    }
+    if (config.panelChannelId && config.panelChannelId !== config.logChannelId) {
+        totalPurged += await purgeChannelMessages(config.panelChannelId, reason);
+    }
+    return totalPurged;
+}
+
+// Scheduled interval for hourly & daily message purges
+let lastHourlyWipe = Date.now();
+let lastDailyWipe = Date.now();
+
+setInterval(() => {
+    const config = getConfig();
+    const mode = config.autoDismiss || (config.autoHideMessages ? '60s' : 'off');
+    const now = Date.now();
+
+    if (mode === 'hourly' && (now - lastHourlyWipe) >= 60 * 60 * 1000) {
+        lastHourlyWipe = now;
+        executeChannelPurge('hourly wipe');
+    } else if (mode === 'daily' && (now - lastDailyWipe) >= 24 * 60 * 60 * 1000) {
+        lastDailyWipe = now;
+        executeChannelPurge('daily wipe');
+    }
+}, 30000);
 
 async function updatePanel(queue) {
     if (!queue || !queue.metadata || !queue.metadata.panelMessage) return;
@@ -267,6 +362,7 @@ function resolveTargetVoiceChannel(guild, preferredChannelId = null) {
 
 async function deployControlPanel(guild, voiceChannel, targetTextChannel, interaction = null) {
     const config = getConfig();
+    const targetVol = getGuildVolume(guild.id);
     let queue = player.nodes.get(guild.id);
     if (!queue) {
         queue = player.nodes.create(guild, { 
@@ -274,13 +370,14 @@ async function deployControlPanel(guild, voiceChannel, targetTextChannel, intera
             leaveOnEmpty: false, 
             leaveOnEnd: false, 
             leaveOnStop: false, 
-            bufferingTimeout: 0 
+            bufferingTimeout: 0,
+            volume: targetVol
         });
     }
     if (!queue.connection || queue.connection.channel.id !== voiceChannel.id) {
         await queue.connect(voiceChannel);
     }
-    if (config.defaultVolume !== undefined) queue.node.setVolume(config.defaultVolume);
+    queue.node.setVolume(targetVol);
 
     await cleanChannel(targetTextChannel, client, 'both');
 
@@ -326,6 +423,7 @@ async function handlePlayback(voiceChannel, rawQuery, interaction = null, textCh
         if (!targetText && config.panelChannelId) targetText = voiceChannel.guild.channels.cache.get(config.panelChannelId);
         if (!targetText) targetText = voiceChannel.guild.channels.cache.filter(c => c.isTextBased()).first();
 
+        const targetVol = getGuildVolume(voiceChannel.guild.id);
         const existingQueue = player.nodes.get(voiceChannel.guild.id);
         const panelMsg = existingQueue && existingQueue.metadata ? existingQueue.metadata.panelMessage : null;
 
@@ -336,11 +434,13 @@ async function handlePlayback(voiceChannel, rawQuery, interaction = null, textCh
                 leaveOnEmpty: false,
                 leaveOnEnd: false,
                 leaveOnStop: false,
-                bufferingTimeout: 0
+                bufferingTimeout: 0,
+                volume: targetVol
             },
             requestedBy: reqUser
         });
 
+        if (queue) queue.node.setVolume(targetVol);
         updatePanel(queue);
         const title = track.playlist ? track.playlist.title : track.title;
         if (interaction) {
@@ -360,6 +460,10 @@ async function handlePlayback(voiceChannel, rawQuery, interaction = null, textCh
 player.events.on('error', (q, e) => logger.error(`Player Error: ${e.message}`));
 player.events.on('playerError', (q, e) => logger.error(`Stream Blocked: ${e.message}`));
 player.events.on('playerStart', (queue, track) => {
+    const targetVol = getGuildVolume(queue.guild.id);
+    if (queue.node.volume !== targetVol) {
+        queue.node.setVolume(targetVol);
+    }
     logNowPlaying(queue.guild, track, queue);
     updatePanel(queue);
     logHistory(track.title);
@@ -681,11 +785,14 @@ app.get('/api/config', (req, res) => {
         logChannelId: config.logChannelId || '',
         defaultVoiceChannelId: config.defaultVoiceChannelId || '',
         defaultVoiceChannels: config.defaultVoiceChannels || {},
+        defaultVolume: config.defaultVolume !== undefined ? config.defaultVolume : 100,
+        guildVolumes: config.guildVolumes || {},
+        autoDismiss: config.autoDismiss || (config.autoHideMessages ? '60s' : 'off'),
+        autoHideMessages: config.autoHideMessages || false,
         logRetentionDays: config.logRetentionDays || 7,
         logLevel: config.logLevel || 'normal',
         logDirectory: config.logDirectory || path.join(__dirname, 'logs'),
         logBackupSchedule: config.logBackupSchedule || 'daily',
-        autoHideMessages: config.autoHideMessages || false,
         savedPlaylists: config.savedPlaylists || [],
         clientId: process.env.CLIENT_ID || '',
         spotifyClientId: config.spotifyClientId || '',
@@ -737,7 +844,14 @@ app.post('/api/settings', (req, res) => {
     if (req.body.logLevel !== undefined) config.logLevel = req.body.logLevel;
     if (req.body.logDirectory !== undefined) config.logDirectory = req.body.logDirectory;
     if (req.body.logBackupSchedule !== undefined) config.logBackupSchedule = req.body.logBackupSchedule;
-    if (req.body.autoHideMessages !== undefined) config.autoHideMessages = req.body.autoHideMessages;
+    if (req.body.autoDismiss !== undefined) {
+        config.autoDismiss = req.body.autoDismiss;
+        config.autoHideMessages = (req.body.autoDismiss !== 'off');
+    } else if (req.body.autoHideMessages !== undefined) {
+        config.autoHideMessages = req.body.autoHideMessages;
+        config.autoDismiss = req.body.autoHideMessages ? '60s' : 'off';
+    }
+    if (req.body.defaultVolume !== undefined) config.defaultVolume = parseInt(req.body.defaultVolume);
     if (req.body.dashboardName !== undefined) config.dashboardName = req.body.dashboardName;
     if (req.body.spotifyClientId !== undefined) config.spotifyClientId = req.body.spotifyClientId;
     if (req.body.spotifyClientSecret !== undefined) config.spotifyClientSecret = req.body.spotifyClientSecret;
@@ -802,7 +916,7 @@ app.get('/api/queue', (req, res) => {
     }
 
     const finalVcId = vcId || config.lastVoiceChannelId || '';
-    const defVol = config.defaultVolume !== undefined ? config.defaultVolume : 100;
+    const defVol = getGuildVolume(guildId);
     const history = config.history || [];
 
     if (!queue) {
@@ -820,7 +934,7 @@ app.get('/api/queue', (req, res) => {
     res.json({
         current: queue.currentTrack ? queue.currentTrack.title : null,
         tracks,
-        volume: queue.node.volume,
+        volume: queue.node.volume !== undefined ? queue.node.volume : defVol,
         voiceChannelId: finalVcId,
         voiceChannelName: vcName,
         history
@@ -852,6 +966,7 @@ app.post('/api/play', async (req, res) => {
     }
     if (!txt) txt = targetGuild.channels.cache.filter(c => c.isTextBased()).first();
 
+    const targetVol = getGuildVolume(targetGuild.id);
     try {
         const existingQueue = client.player.nodes.get(vc.guild.id);
         const panelMsg = existingQueue && existingQueue.metadata ? existingQueue.metadata.panelMessage : null;
@@ -861,9 +976,12 @@ app.post('/api/play', async (req, res) => {
                 leaveOnEmpty: false,
                 leaveOnEnd: false,
                 leaveOnStop: false,
-                bufferingTimeout: 0
+                bufferingTimeout: 0,
+                volume: targetVol
             }
         });
+        const q = client.player.nodes.get(targetGuild.id);
+        if (q) q.node.setVolume(targetVol);
         res.json({ success: true });
     } catch (e) {
         res.json({ success: false, message: e.message });
@@ -916,13 +1034,18 @@ app.post('/api/control', (req, res) => {
 });
 
 app.post('/api/volume', (req, res) => {
-    const queue = req.body.guildId ? client.player?.nodes?.get(req.body.guildId) : client.player?.nodes?.cache?.first();
-    const vol = parseInt(req.body.volume);
-    if (queue && !isNaN(vol)) queue.node.setVolume(vol);
-    const config = getConfig();
-    config.defaultVolume = vol;
-    saveConfig(config);
-    res.json({ success: true });
+    const { volume, guildId } = req.body;
+    const vol = parseInt(volume);
+    if (isNaN(vol)) return res.json({ success: false, message: 'Invalid volume' });
+
+    saveGuildVolume(guildId, vol);
+
+    const queue = guildId ? client.player?.nodes?.get(guildId) : client.player?.nodes?.cache?.first();
+    if (queue) {
+        queue.node.setVolume(vol);
+        updatePanel(queue);
+    }
+    res.json({ success: true, volume: vol });
 });
 
 app.post('/api/voice', async (req, res) => {
@@ -949,6 +1072,7 @@ app.post('/api/voice', async (req, res) => {
             ? targetGuild.channels.cache.get(config.panelChannelId)
             : targetGuild.channels.cache.filter(c => c.isTextBased()).first();
 
+        const targetVol = getGuildVolume(targetGuild.id);
         try {
             let queue = client.player.nodes.get(targetGuild.id);
             if (!queue) {
@@ -957,13 +1081,14 @@ app.post('/api/voice', async (req, res) => {
                     leaveOnEmpty: false,
                     leaveOnEnd: false,
                     leaveOnStop: false,
-                    bufferingTimeout: 0
+                    bufferingTimeout: 0,
+                    volume: targetVol
                 });
             }
             if (!queue.connection || queue.connection.channel.id !== vc.id) {
                 await queue.connect(vc);
             }
-            if (config.defaultVolume !== undefined) queue.node.setVolume(config.defaultVolume);
+            queue.node.setVolume(targetVol);
             return res.json({ success: true, channelName: vc.name, channelId: vc.id });
         } catch (err) {
             return res.json({ success: false, message: err.message });
@@ -981,6 +1106,11 @@ app.post('/api/voice/default', (req, res) => {
     config.defaultVoiceChannelId = channelId;
     saveConfig(config);
     res.json({ success: true });
+});
+
+app.post('/api/messages/wipe', async (req, res) => {
+    const count = await executeChannelPurge('manual wipe');
+    res.json({ success: true, count, message: `Purged ${count} message(s)` });
 });
 
 app.get('/api/logs', (req, res) => {

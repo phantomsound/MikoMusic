@@ -96,7 +96,7 @@
                 <div style="display: flex; align-items: center; gap: 10px; background: var(--input); padding: 0.4rem 0.9rem; border-radius: 20px; border: 1px solid var(--border);">
                     <span>Volume: <b id="volLabel">100</b>%</span>
                     <button id="muteToggleBtn" onclick="toggleMute()" style="padding: 0; background: transparent; border: none; font-size: 1.2rem; cursor: pointer;">🔊</button>
-                    <input type="range" id="volSlider" min="0" max="200" value="100" onchange="setVolume()" style="width: 140px; cursor: pointer;">
+                    <input type="range" id="volSlider" min="0" max="200" value="100" oninput="onVolInput()" onchange="setVolume()" style="width: 140px; cursor: pointer;">
                 </div>
             </div>
             <div class="overrides-grid">
@@ -187,10 +187,21 @@
                 <label style="display:block; margin-top:12px; font-weight:600; font-size:0.88rem;">Notification Log Channel:</label>
                 <select id="logChannelId"><option value="">-- Do Not Send Logs --</option></select>
                 
-                <label style="display:flex; align-items:center; gap: 8px; margin-top:15px; font-size:0.9rem; cursor:pointer;">
-                    <input type="checkbox" id="autoHideMessages" style="width:18px; height:18px; accent-color: var(--blue);">
-                    <b>Auto-Hide Discord Messages</b> (Delete 'Now Playing' logs after 60s)
-                </label>
+                <div style="margin-top: 15px;">
+                    <label style="display:block; font-weight:600; font-size:0.88rem; margin-bottom: 6px;">Auto-Dismiss / Message Cleanup:</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <select id="autoDismiss" style="flex: 1;">
+                            <option value="15s">15 Seconds (Quick Fade)</option>
+                            <option value="30s">30 Seconds</option>
+                            <option value="60s">60 Seconds (Default)</option>
+                            <option value="hourly">Hourly Wipe (Every 60 mins)</option>
+                            <option value="daily">Daily Wipe (Every 24 hours)</option>
+                            <option value="off">Off (Keep All Messages)</option>
+                        </select>
+                        <button type="button" onclick="manualWipeMessages()" class="btn-secondary" title="Manually purge temporary bot messages right now">🧹 Wipe Now</button>
+                    </div>
+                    <span class="help-text">Automatically dismisses or sweeps 'Now Streaming' notifications to keep your Discord channels clean.</span>
+                </div>
                 <button onclick="saveToolsConfig()" class="btn-success" style="margin-top: 1rem; width: 100%;">💾 Save UI Routing</button>
             </div>
         </div>
@@ -269,7 +280,7 @@
     </div>
 
     <script>
-        let cachedPlaylists = [], isFirstLoad = true, draggedIndex = null, isMuted = false, preMuteVol = 100, currentQueueState = { current: null, tracks: [] };
+        let cachedPlaylists = [], isFirstLoad = true, draggedIndex = null, isMuted = false, preMuteVol = 100, currentQueueState = { current: null, tracks: [] }, volDebounceTimer = null, isUserAdjustingVol = false, syncGuildVolume = true;
 
         function apiFetch(url, options = {}) {
             return fetch(url, { cache: 'no-store', ...options });
@@ -281,7 +292,7 @@
         function toggleAccordion(id) { document.getElementById(id).classList.toggle('open'); }
         function escapeHTML(str) { return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag])); }
 
-        function switchGuildContext() { loadChannels(); refreshQueue(); }
+        function switchGuildContext() { syncGuildVolume = true; loadChannels(); refreshQueue(); }
 
         function updateServerInfo() {
             apiFetch('/api/server-info').then(r => r.json()).then(data => {
@@ -326,7 +337,11 @@
                 if (data.logLevel) document.getElementById('logLevel').value = data.logLevel;
                 if (data.logDirectory) document.getElementById('logDirectory').value = data.logDirectory;
                 if (data.logBackupSchedule) document.getElementById('logBackupSchedule').value = data.logBackupSchedule;
-                if (data.autoHideMessages) document.getElementById('autoHideMessages').checked = true;
+                if (data.autoDismiss) {
+                    document.getElementById('autoDismiss').value = data.autoDismiss;
+                } else if (data.autoHideMessages !== undefined) {
+                    document.getElementById('autoDismiss').value = data.autoHideMessages ? '60s' : 'off';
+                }
                 if (data.spotifyClientId) document.getElementById('spotifyClientId').value = data.spotifyClientId;
                 if (data.spotifyClientSecret) document.getElementById('spotifyClientSecret').value = data.spotifyClientSecret;
                 if (data.clientId && document.getElementById('discordClientId')) document.getElementById('discordClientId').value = data.clientId;
@@ -411,11 +426,14 @@
         function fetchLogs() { apiFetch('/api/logs').then(r => r.json()).then(data => { const b = document.getElementById('terminalBox'); b.innerText = data.logs || "Log file empty."; b.scrollTop = b.scrollHeight; }); }
 
         function saveToolsConfig() {
+            const autoDismissVal = document.getElementById('autoDismiss').value;
             apiFetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ 
                 logRetentionDays: parseInt(document.getElementById('logRetentionDays').value), logLevel: document.getElementById('logLevel').value,
                 logDirectory: document.getElementById('logDirectory').value.trim(), logBackupSchedule: document.getElementById('logBackupSchedule').value,
                 spotifyClientId: document.getElementById('spotifyClientId').value.trim(), spotifyClientSecret: document.getElementById('spotifyClientSecret').value.trim(),
-                panelChannelId: document.getElementById('panelChannelId').value, logChannelId: document.getElementById('logChannelId').value, autoHideMessages: document.getElementById('autoHideMessages').checked
+                panelChannelId: document.getElementById('panelChannelId').value, logChannelId: document.getElementById('logChannelId').value, 
+                autoDismiss: autoDismissVal,
+                autoHideMessages: (autoDismissVal !== 'off')
             })}).then(() => alert(`Tool settings saved successfully!`));
         }
 
@@ -437,11 +455,13 @@
                     bindDragEvents(); filterQueue();
                 }
 
-                if (isFirstLoad && data.volume !== undefined) { 
+                if ((syncGuildVolume || isFirstLoad) && !isUserAdjustingVol && data.volume !== undefined) { 
                     document.getElementById('volSlider').value = data.volume; 
                     document.getElementById('volLabel').innerText = data.volume; 
                     if (data.volume == 0) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; } 
+                    else { isMuted = false; document.getElementById('muteToggleBtn').innerText = '🔊'; }
                     isFirstLoad = false; 
+                    syncGuildVolume = false;
                 }
                 
                 const vcStatus = document.getElementById('connectedVcStatus');
@@ -496,8 +516,48 @@
             }); 
         }
         
-        function toggleMute() { const s = document.getElementById('volSlider'); if (isMuted) { isMuted = false; s.value = preMuteVol; document.getElementById('muteToggleBtn').innerText = '🔊'; } else { isMuted = true; preMuteVol = s.value == 0 ? 100 : s.value; s.value = 0; document.getElementById('muteToggleBtn').innerText = '🔇'; } setVolume(); }
-        function setVolume() { const vol = document.getElementById('volSlider').value; document.getElementById('volLabel').innerText = vol; if (vol > 0 && isMuted) { isMuted = false; document.getElementById('muteToggleBtn').innerText = '🔊'; } else if (vol == 0 && !isMuted) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; } apiFetch('/api/volume', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ volume: vol, guildId: getActiveGuildId() }) }); }
+        function onVolInput() {
+            const vol = document.getElementById('volSlider').value;
+            document.getElementById('volLabel').innerText = vol;
+            isUserAdjustingVol = true;
+            clearTimeout(volDebounceTimer);
+            volDebounceTimer = setTimeout(() => {
+                setVolume();
+                isUserAdjustingVol = false;
+            }, 150);
+        }
+
+        function toggleMute() { 
+            const s = document.getElementById('volSlider'); 
+            if (isMuted) { 
+                isMuted = false; 
+                s.value = preMuteVol > 0 ? preMuteVol : 100; 
+                document.getElementById('muteToggleBtn').innerText = '🔊'; 
+            } else { 
+                isMuted = true; 
+                preMuteVol = s.value == 0 ? 100 : s.value; 
+                s.value = 0; 
+                document.getElementById('muteToggleBtn').innerText = '🔇'; 
+            } 
+            setVolume(); 
+        }
+
+        function setVolume() { 
+            const vol = document.getElementById('volSlider').value; 
+            document.getElementById('volLabel').innerText = vol; 
+            if (vol > 0 && isMuted) { isMuted = false; document.getElementById('muteToggleBtn').innerText = '🔊'; } 
+            else if (vol == 0 && !isMuted) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; } 
+            apiFetch('/api/volume', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ volume: vol, guildId: getActiveGuildId() }) }); 
+        }
+
+        function manualWipeMessages() {
+            if (confirm("Purge bot temporary logs from the configured Discord channels now?")) {
+                apiFetch('/api/messages/wipe', { method: 'POST' }).then(r => r.json()).then(res => {
+                    alert(res.message || 'Messages wiped successfully!');
+                    fetchLogs();
+                });
+            }
+        }
 
         async function directLoadPlaylist(url) {
             if (confirm("Clear active queue and stream this playlist now?")) {
