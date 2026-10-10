@@ -237,14 +237,6 @@
                 • <b>Move via Discord:</b> Click <b>↕️ Move</b> on the Discord panel to open a quick modal and change track orders on the fly.<br>
                 • <b>Self-Cleaning Messages:</b> All interaction responses are Discord Ephemerals ("Only you can see this") and auto-purge when Discord restarts.
             </div>
-
-            <div class="accordion-header" onclick="toggleAccordion('guide-sfx')">
-                <span>3. Architecture Note: Music vs Soundboards</span><span>▼</span>
-            </div>
-            <div id="guide-sfx" class="accordion-body">
-                • Discord physically prevents a single bot from playing two audio streams at the same time.<br>
-                • For overlapping D&D sound effects, the recommended architecture is deploying a secondary, lightweight sibling bot ("Miko SFX") that hosts an overlapping soundboard without interrupting Miko Music's engine.
-            </div>
         </div>
     </div>
 
@@ -298,7 +290,7 @@
             });
             fetch(`/api/voice-channels?guildId=${guildId}`).then(r => r.json()).then(channels => {
                 const vcSelect = document.getElementById('voiceChannelSelect');
-                vcSelect.innerHTML = '<option value="">-- Select Voice Channel --</option>';
+                vcSelect.innerHTML = '<option value="">-- Voice Channel --</option>';
                 channels.forEach(c => vcSelect.innerHTML += `<option value="${c.id}">${c.name}</option>`);
             });
         }
@@ -331,15 +323,18 @@
                         </div>`).join('');
                     bindDragEvents(); filterQueue();
                 }
-                                if (isFirstLoad && data.volume !== undefined) { 
+
+                if (isFirstLoad && data.volume !== undefined) { 
                     document.getElementById('volSlider').value = data.volume; 
                     document.getElementById('volLabel').innerText = data.volume; 
                     if (data.volume == 0) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; } 
                     isFirstLoad = false; 
                 }
-                if (data.voiceChannelId && document.getElementById('voiceChannelSelect')) {
-                    if (document.getElementById('voiceChannelSelect').value !== data.voiceChannelId) {
-                        document.getElementById('voiceChannelSelect').value = data.voiceChannelId;
+                
+                if (data.voiceChannelId) {
+                    const dropdown = document.getElementById('voiceChannelSelect');
+                    if (dropdown && dropdown.value !== data.voiceChannelId) {
+                        dropdown.value = data.voiceChannelId;
                     }
                 }
             });
@@ -434,4 +429,3 @@
     </script>
 </body>
 </html>
-
