@@ -361,6 +361,7 @@ function resolveTargetVoiceChannel(guild, preferredChannelId = null) {
 }
 
 async function deployControlPanel(guild, voiceChannel, targetTextChannel, interaction = null) {
+    if (!guild || !voiceChannel || !targetTextChannel) return;
     const config = getConfig();
     const targetVol = getGuildVolume(guild.id);
     let queue = player.nodes.get(guild.id);
@@ -496,6 +497,13 @@ client.once('clientReady', async () => {
 // Client Interactions
 client.on('interactionCreate', async interaction => {
     try {
+        if (!interaction.guildId || !interaction.guild) {
+            if (interaction.isRepliable()) {
+                return interaction.reply({ content: '❌ Commands must be run in a Discord server.', flags: [64] }).catch(() => {});
+            }
+            return;
+        }
+
         if (interaction.isButton()) {
             if (interaction.customId === 'btn_sfx_summon') {
                 return interaction.deferUpdate().catch(() => {});

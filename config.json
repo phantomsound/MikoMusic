@@ -36,6 +36,14 @@
   "lastVoiceChannelId": "1518424763784101908",
   "history": [
     {
+      "name": "I Am a Place",
+      "time": "05:51:50 PM"
+    },
+    {
+      "name": "Exoplanet",
+      "time": "05:51:37 PM"
+    },
+    {
       "name": "Daylight",
       "time": "05:47:57 PM"
     },
@@ -66,14 +74,6 @@
     {
       "name": "Everything Gone",
       "time": "05:12:11 PM"
-    },
-    {
-      "name": "Lost Tapes",
-      "time": "05:09:34 PM"
-    },
-    {
-      "name": "Exoplanet",
-      "time": "05:07:08 PM"
     }
   ],
   "defaultVoiceChannels": {
