@@ -5,7 +5,7 @@ const logger = require('./logger');
 
 function getConfig() { try { return JSON.parse(fs.readFileSync('./config.json', 'utf-8')); } catch (e) { return {}; } }
 
-async function cleanChannel(channel, client, type) {
+async function cleanChannel(channel, client, type = 'both') {
     try {
         const msgs = await channel.messages.fetch({ limit: 50 });
         for (const [id, m] of msgs) { 
@@ -18,7 +18,6 @@ async function cleanChannel(channel, client, type) {
             }
         }
     } catch(e) {}
-}
 }
 
 async function logNowPlaying(guild, track, queue) {
@@ -97,7 +96,7 @@ function renderQueueEmbed(queue, page = 1) {
         .setColor('#2b2d31')
         .setTitle(`📋 Live Music Queue (Page ${currPage} of ${totalPages})`)
         .setDescription(`**Now Playing:** ${queue.currentTrack ? queue.currentTrack.title : 'Nothing'}\n\n` + 
-            (pageTracks.length > 0 ? pageTracks.map((t, i) => `**${start + i + 1}.** ${t.title} - \`${t.duration}\``).join('\n') : '*No upcoming tracks.*')
+            (pageTracks.length > 0 ? pageTracks.map((t, i) => `\`${start + i + 1}.\` **${t.title}** - \`${t.duration}\``).join('\n') : '*No upcoming tracks.*')
         )
         .setFooter({ text: `Total Queue: ${tracks.length} tracks` });
 
@@ -224,7 +223,6 @@ function startBot() {
 
                 const queue = player.nodes.get(interaction.guildId);
 
-                // Queue Pagination
                 if (interaction.customId.startsWith('btn_qp_')) {
                     if (!queue) return interaction.reply({ content: 'Queue is empty.', flags: [ 64 ] });
                     const parts = interaction.customId.split('_');
@@ -309,4 +307,3 @@ function startBot() {
     return client;
 }
 module.exports = { startBot };
-
