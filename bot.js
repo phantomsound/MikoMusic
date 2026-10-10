@@ -74,13 +74,15 @@ async function ensureStandbyBanner(client) {
         
         const embed = new EmbedBuilder()
             .setColor('#89b4fa')
-            .setTitle('🎵 Miko Music Standby Hub')
-            .setDescription('Click below to summon the music bot into your active voice channel.');
+            .setTitle('🎵 Miko Command Hub')
+            .setDescription('Click below to summon the active engines into your voice channel.');
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('btn_summon_standby').setLabel('🔊 Summon to Voice Channel').setStyle(ButtonStyle.Success)
+            new ButtonBuilder().setCustomId('btn_summon_standby').setLabel('🔊 Summon Music Engine').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('btn_sfx_summon').setLabel('🎙️ Summon SFX Engine').setStyle(ButtonStyle.Success)
         );
         await channel.send({ embeds: [embed], components: [row] });
     } catch(e) {}
+}
 }
 
 function renderQueueEmbed(queue, page = 1) {
@@ -213,6 +215,7 @@ function startBot() {
     client.on('interactionCreate', async interaction => {
         try {
             if (interaction.isButton()) {
+                if (interaction.customId === 'btn_sfx_summon') { return interaction.deferUpdate().catch(()=>{}); }
                 if (interaction.customId === 'btn_summon_standby') {
                     const channel = interaction.member?.voice?.channel;
                     if (!channel) return interaction.reply({ content: '❌ You must be in a Voice Channel to summon the bot!', flags: [ 64 ] });
@@ -307,3 +310,4 @@ function startBot() {
     return client;
 }
 module.exports = { startBot };
+
