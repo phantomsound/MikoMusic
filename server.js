@@ -4,8 +4,8 @@ const path = require('path');
 const { exec } = require('child_process');
 const { QueueRepeatMode } = require('discord-player');
 
-function getConfig() { try { return JSON.parse(fs.readFileSync('./config.json', 'utf-8')); } catch (e) { return {}; } }
-function saveConfig(cfg) { fs.writeFileSync('./config.json', JSON.stringify(cfg, null, 2)); }
+function getConfig() { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf-8')); } catch (e) { return { history: [] }; } }
+function saveConfig(cfg) { fs.writeFileSync(path.join(__dirname, 'config.json'), JSON.stringify(cfg, null, 2)); }
 
 function startServer(client) {
     const app = express();
@@ -92,11 +92,12 @@ function startServer(client) {
         
         const finalVcId = vcId || config.lastVoiceChannelId || '';
         const defVol = config.defaultVolume !== undefined ? config.defaultVolume : 100;
+        const history = config.history || [];
         
-        if (!queue) return res.json({ current: null, tracks: [], volume: defVol, voiceChannelId: finalVcId });
+        if (!queue) return res.json({ current: null, tracks: [], volume: defVol, voiceChannelId: finalVcId, history });
         
-        const tracks = queue.tracks.toArray().map((t, i) => ({ title: t.title, duration: t.duration, index: i + 1 }));
-        res.json({ current: queue.currentTrack ? queue.currentTrack.title : null, tracks, volume: queue.node.volume, voiceChannelId: finalVcId });
+        const tracks = queue.tracks.toArray().map((t, i) => ({ title: t.title, author: t.author, duration: t.duration, url: t.url, index: i + 1 }));
+        res.json({ current: queue.currentTrack ? queue.currentTrack.title : null, tracks, volume: queue.node.volume, voiceChannelId: finalVcId, history });
     });
 
     app.post('/api/play', async (req, res) => {
@@ -190,12 +191,23 @@ function startServer(client) {
             saveConfig(config);
 
             const txt = config.panelChannelId ? vc.guild.channels.cache.get(config.panelChannelId) : vc.guild.channels.cache.filter(c=>c.isTextBased()).first();
-            const queue = client.player.nodes.create(vc.guild, { metadata: { channel: txt, panelMessage: null }, leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false, bufferingTimeout: 0 });
-            await queue.connect(vc);
             
-            if (config.defaultVolume !== undefined) queue.node.setVolume(config.defaultVolume);
-            
-            return res.json({ success: true });
+            try {
+                let queue = client.player.nodes.get(vc.guild.id);
+                if (!queue) {
+                    queue = client.player.nodes.create(vc.guild, { metadata: { channel: txt, panelMessage: null }, leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false, bufferingTimeout: 0 });
+                }
+                
+                // FIX: Force reconnection if the websocket dropped or changed channels
+                if (!queue.connection || queue.connection.channel.id !== vc.id) {
+                    await queue.connect(vc);
+                }
+                
+                if (config.defaultVolume !== undefined) queue.node.setVolume(config.defaultVolume);
+                return res.json({ success: true });
+            } catch (err) {
+                return res.json({ success: false, message: err.message });
+            }
         }
         res.json({ success: false });
     });

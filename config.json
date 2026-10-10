@@ -28,8 +28,8 @@
   "logChannelId": "1557946871152906370",
   "logRetentionDays": 7,
   "autoHideMessages": true,
-  "spotifyClientId": "",
-  "spotifyClientSecret": "",
+  "spotifyClientId": "6cca29b2d32c4979bbedc53703302509",
+  "spotifyClientSecret": "1350816f1b6d4fbb805d6106f731195f",
   "logLevel": "normal",
   "logDirectory": "C:\\Apps\\MikoDiscordMusicBot\\logs",
   "logBackupSchedule": "daily"

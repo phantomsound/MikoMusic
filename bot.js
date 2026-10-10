@@ -1,17 +1,28 @@
 ﻿const { Client, GatewayIntentBits, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
 const { Player, QueueRepeatMode } = require('discord-player');
 const fs = require('fs');
+const path = require('path');
 const logger = require('./logger');
 
-function getConfig() { try { return JSON.parse(fs.readFileSync('./config.json', 'utf-8')); } catch (e) { return {}; } }
+function getConfig() { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf-8')); } catch (e) { return {}; } }
+function saveConfig(cfg) { fs.writeFileSync(path.join(__dirname, 'config.json'), JSON.stringify(cfg, null, 2)); }
+
+function logHistory(songName) {
+    const config = getConfig();
+    if (!config.history) config.history = [];
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    config.history.unshift({ name: songName, time });
+    if (config.history.length > 10) config.history.pop();
+    saveConfig(config);
+}
 
 async function cleanChannel(channel, client, type = 'both') {
     try {
         const msgs = await channel.messages.fetch({ limit: 50 });
         for (const [id, m] of msgs) { 
             if (m.author.id === client.user.id) {
-                const isStandby = m.embeds[0]?.title?.includes('Standby');
-                const isCommand = m.embeds[0]?.title?.includes('Command Center');
+                const isStandby = m.embeds[0]?.title?.includes('Standby') || m.embeds[0]?.title?.includes('Hub');
+                const isCommand = m.embeds[0]?.title?.includes('Command Center') || m.embeds[0]?.title?.includes('Control Panel');
                 if (type === 'standby' && isStandby) await m.delete().catch(()=>{});
                 if (type === 'command' && isCommand) await m.delete().catch(()=>{});
                 if (type === 'both' && (isStandby || isCommand)) await m.delete().catch(()=>{});
@@ -83,7 +94,6 @@ async function ensureStandbyBanner(client) {
         await channel.send({ embeds: [embed], components: [row] });
     } catch(e) {}
 }
-}
 
 function renderQueueEmbed(queue, page = 1) {
     const tracks = queue.tracks.toArray();
@@ -119,17 +129,15 @@ function startBot() {
     
     logger.initLogger(client);
 
-    player.events.on('error', (q, e) => console.log('❌ Player Error:', e.message));
-    player.events.on('playerError', (q, e) => console.log('❌ Stream Blocked:', e.message));
+    player.events.on('error', (q, e) => logger.error(`Player Error: ${e.message}`));
+    player.events.on('playerError', (q, e) => logger.error(`Stream Blocked: ${e.message}`));
     
-    player.events.on('debug', (q, m) => {
-        const config = getConfig();
-        const level = config.logLevel || 'normal';
-        if (level === 'verbose') console.log('🔍 [VERBOSE]', m);
-        else if (level === 'debug' && (m.toLowerCase().includes('bridge') || m.toLowerCase().includes('spotify') || m.toLowerCase().includes('extract') || m.toLowerCase().includes('search'))) console.log('🔍 [DEBUG]', m);
+    player.events.on('playerStart', (queue, track) => { 
+        logNowPlaying(queue.guild, track, queue); 
+        updatePanel(queue); 
+        logHistory(track.title); 
     });
-
-    player.events.on('playerStart', (queue, track) => { logNowPlaying(queue.guild, track, queue); updatePanel(queue); });
+    
     player.events.on('audioTrackAdd', (queue) => updatePanel(queue));
     player.events.on('audioTracksAdd', (queue) => updatePanel(queue));
     player.events.on('audioTrackRemove', (queue) => updatePanel(queue));
@@ -153,13 +161,24 @@ function startBot() {
             const remaining = DefaultExtractors.filter(ext => ext.name !== 'SpotifyExtractor');
             await player.extractors.loadMulti(remaining);
         } catch (e) {}
-        console.log(`🤖 Discord Bot connected as ${client.user.tag}`);
+        logger.info(`🤖 Miko Music Bot connected as ${client.user.tag}`);
         await ensureStandbyBanner(client);
     });
 
     async function deployControlPanel(guild, channel, targetTextChannel, interaction = null) {
-        const queue = player.nodes.create(guild, { metadata: { channel: targetTextChannel, panelMessage: null }, leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false, bufferingTimeout: 0 });
-        if (!queue.connection) await queue.connect(channel);
+        const config = getConfig();
+        
+        let queue = player.nodes.get(guild.id);
+        if (!queue) {
+            queue = player.nodes.create(guild, { metadata: { channel: targetTextChannel, panelMessage: null }, leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false, bufferingTimeout: 0 });
+        }
+        
+        // FIX: Force reconnection if websocket dropped
+        if (!queue.connection || queue.connection.channel.id !== channel.id) {
+            await queue.connect(channel);
+        }
+        
+        if (config.defaultVolume !== undefined) queue.node.setVolume(config.defaultVolume);
         
         await cleanChannel(targetTextChannel, client, 'both');
         
@@ -215,7 +234,10 @@ function startBot() {
     client.on('interactionCreate', async interaction => {
         try {
             if (interaction.isButton()) {
-                if (interaction.customId === 'btn_sfx_summon') { return interaction.deferUpdate().catch(()=>{}); }
+                if (interaction.customId === 'btn_sfx_summon') {
+                    return interaction.deferUpdate().catch(()=>{});
+                }
+
                 if (interaction.customId === 'btn_summon_standby') {
                     const channel = interaction.member?.voice?.channel;
                     if (!channel) return interaction.reply({ content: '❌ You must be in a Voice Channel to summon the bot!', flags: [ 64 ] });
@@ -270,7 +292,7 @@ function startBot() {
 
                 if (interaction.customId === 'btn_pause') { queue.node.setPaused(!queue.node.isPaused()); await interaction.reply({ content: '⏯️ Toggled playback.', flags: [ 64 ] }); updatePanel(queue); }
                 if (interaction.customId === 'btn_skip') { queue.node.skip(); await interaction.reply({ content: '⏭️ Skipped track.', flags: [ 64 ] }); }
-                if (interaction.customId === 'btn_stop') { queue.node.setPaused(false); queue.tracks.clear(); queue.node.skip(); await interaction.reply({ content: '⏹️ Cleared queue without disconnecting.', flags: [ 64 ] }); updatePanel(queue); }
+                if (interaction.customId === 'btn_stop') { queue.node.setPaused(false); queue.tracks.clear(); queue.node.skip(); await interaction.reply({ content: '⏹️ Cleared queue.', flags: [ 64 ] }); updatePanel(queue); }
                 if (interaction.customId === 'btn_back' && queue.history.previousTrack) { await queue.history.previous(); await interaction.reply({ content: '⏮️ Returning to previous track.', flags: [ 64 ] }); }
                 if (interaction.customId === 'btn_shuffle') { queue.tracks.shuffle(); await interaction.reply({ content: '🔀 Queue shuffled.', flags: [ 64 ] }); updatePanel(queue); }
                 if (interaction.customId === 'btn_loop_track') { queue.setRepeatMode(QueueRepeatMode.TRACK); await interaction.reply({ content: '🔂 Looping single track.', flags: [ 64 ] }); updatePanel(queue); }
@@ -310,4 +332,3 @@ function startBot() {
     return client;
 }
 module.exports = { startBot };
-
