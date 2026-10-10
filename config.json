@@ -36,6 +36,30 @@
   "lastVoiceChannelId": "1518424763784101908",
   "history": [
     {
+      "name": "Daylight",
+      "time": "05:47:57 PM"
+    },
+    {
+      "name": "Little Walk",
+      "time": "05:46:12 PM"
+    },
+    {
+      "name": "Behind Every Light",
+      "time": "05:45:43 PM"
+    },
+    {
+      "name": "Exoplanet",
+      "time": "05:43:13 PM"
+    },
+    {
+      "name": "Lost Tapes",
+      "time": "05:40:16 PM"
+    },
+    {
+      "name": "Exoplanet",
+      "time": "05:37:46 PM"
+    },
+    {
       "name": "That's Just Beautiful",
       "time": "05:14:05 PM"
     },
@@ -50,39 +74,15 @@
     {
       "name": "Exoplanet",
       "time": "05:07:08 PM"
-    },
-    {
-      "name": "Exoplanet",
-      "time": "05:05:16 PM"
-    },
-    {
-      "name": "Lost Tapes",
-      "time": "05:05:13 PM"
-    },
-    {
-      "name": "I Can't Remember Her Face",
-      "time": "05:05:09 PM"
-    },
-    {
-      "name": "still here",
-      "time": "05:05:04 PM"
-    },
-    {
-      "name": "I Can't Remember Her Face",
-      "time": "05:04:59 PM"
-    },
-    {
-      "name": "Lost Tapes",
-      "time": "05:04:53 PM"
     }
   ],
   "defaultVoiceChannels": {
     "804535377062658059": "1518424763784101908"
   },
   "defaultVoiceChannelId": "1518424763784101908",
-  "defaultVolume": 75,
+  "defaultVolume": 39,
   "guildVolumes": {
-    "804535377062658059": 75
+    "804535377062658059": 39
   },
-  "autoDismiss": "30s"
+  "autoDismiss": "15s"
 }
