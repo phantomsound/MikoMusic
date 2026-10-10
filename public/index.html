@@ -5,22 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Miko Music - Admin</title>
     <style>
-        :root {
-            --bg: #1e1e2e; --card: #282a36; --card-alt: #313244;
-            --input: #181825; --border: #45475a; --text: #cdd6f4;
-            --blue: #89b4fa; --green: #a6e3a1; --red: #f38ba8; --yellow: #f9e2af;
-        }
+        :root { --bg: #1e1e2e; --card: #282a36; --card-alt: #313244; --input: #181825; --border: #45475a; --text: #cdd6f4; --blue: #89b4fa; --green: #a6e3a1; --red: #f38ba8; --yellow: #f9e2af; }
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; max-width: 1040px; margin: 0 auto; line-height: 1.4; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
-        
         .tab-nav { display: flex; gap: 10px; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
         .tab-btn { background: transparent; color: var(--text); border: none; padding: 0.6rem 1.2rem; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1.05rem; opacity: 0.6; transition: 0.2s; }
         .tab-btn:hover { opacity: 1; background: var(--card); }
         .tab-btn.active { opacity: 1; background: var(--blue); color: #11111b; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-
         .grid-layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; }
         .card { background: var(--card); padding: 1.4rem; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.15); margin-bottom: 1.5rem; }
         .card.full { width: 100%; margin-bottom: 1.5rem; }
@@ -31,26 +25,20 @@
         button:hover { filter: brightness(1.15); }
         .btn-success { background: var(--green); } .btn-danger { background: var(--red); color: #11111b; } .btn-warning { background: var(--yellow); } .btn-secondary { background: var(--card-alt); color: var(--text); border: 1px solid var(--border); }
         .help-text { font-size: 0.82rem; color: #a6adc8; margin-bottom: 0.8rem; display: block; }
-
         .overrides-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 1rem; }
         @media (max-width: 700px) { .overrides-grid { grid-template-columns: repeat(2, 1fr); } }
         .overrides-grid button { width: 100%; padding: 0.75rem; }
-
         .pl-item { display: grid; grid-template-columns: 2fr 1.2fr 3.5fr 45px; gap: 10px; background: var(--input); padding: 0.75rem; border-radius: 6px; margin-top: 0.5rem; align-items: center; border: 1px solid var(--border); }
         .pl-item button { padding: 0.65rem; }
-
         .queue-container { max-height: 220px; overflow-y: auto; background: var(--input); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; margin-top: 0.5rem; }
         .queue-item { display: flex; align-items: center; gap: 10px; padding: 0.55rem 0.75rem; background: var(--card); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 6px; cursor: grab; user-select: none; transition: background 0.15s; }
         .queue-item:hover { background: var(--card-alt); }
         .queue-item.dragging { opacity: 0.4; transform: scale(0.98); }
         .drag-handle { color: #6c7086; cursor: grab; font-size: 1.1rem; }
         .queue-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.92rem; }
-
         .move-box { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.8rem; background: var(--input); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border); }
         .move-box input { width: 75px; text-align: center; }
-
         .terminal-box { background: #11111b; border: 1px solid var(--border); border-radius: 6px; padding: 0.8rem; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.82rem; height: 230px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #a6e3a1; margin-top: 0.6rem; }
-        
         .accordion-header { background: var(--input); padding: 0.8rem 1rem; border-radius: 6px; cursor: pointer; border: 1px solid var(--border); margin-top: 0.5rem; display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 0.95rem; }
         .accordion-body { display: none; background: #181825; padding: 1rem; border: 1px solid var(--border); border-top: none; border-radius: 0 0 6px 6px; font-size: 0.88rem; color: #bac2de; line-height: 1.5; }
         .accordion-body.open { display: block; }
@@ -73,15 +61,11 @@
         <button class="tab-btn" onclick="switchTab('tools')">⚙️ System Tools</button>
     </div>
 
-    <!-- MAIN DASHBOARD -->
     <div id="tab-main" class="tab-content active">
         <div class="card full" style="border-left: 4px solid var(--blue);">
             <h3>📡 Remote Voice Connection</h3>
-            <span class="help-text">Instantly summon or disconnect the bot from voice channels without touching Discord.</span>
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                <select id="voiceChannelSelect" style="max-width: 320px;">
-                    <option value="">-- Select Voice Channel --</option>
-                </select>
+                <select id="voiceChannelSelect" style="max-width: 320px;"><option value="">-- Select Voice Channel --</option></select>
                 <button onclick="manageVoice('join')" class="btn-success">🔊 Join Channel</button>
                 <button onclick="manageVoice('disconnect')" class="btn-danger">🔇 Disconnect</button>
             </div>
@@ -120,14 +104,19 @@
             </div>
 
             <div class="card" style="margin-bottom: 0;">
-                <h3>Live Queue Management</h3>
-                <span class="help-text">Drag items by handle ☰ to reorder, or use manual inputs.</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                    <h3 style="margin: 0;">Live Queue Management</h3>
+                </div>
                 <div style="display: flex; gap: 8px; margin-bottom: 0.8rem;">
                     <input type="text" id="remotePlayInput" placeholder="Queue track URL or shortcode (e.g., fng)..." style="flex: 1;">
                     <button class="btn-success" onclick="remotePlay()">▶️ Play</button>
                 </div>
+                
                 <div id="activeNowPlaying" style="color: var(--green); font-weight: bold; margin-bottom: 0.4rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">▶️ Nothing Playing</div>
+                
+                <input type="text" id="queueSearch" placeholder="🔍 Search queue to find or remove tracks..." oninput="filterQueue()" style="margin-bottom: 0.5rem; background: var(--card-alt);">
                 <div class="queue-container" id="queueContainer"></div>
+                
                 <div class="move-box">
                     <span style="font-size:0.88rem;">Move #</span>
                     <input type="number" id="moveFrom" min="1">
@@ -168,7 +157,6 @@
             </div>
         </div>
 
-        <!-- LOG & SYSTEM CONTROLS -->
         <div class="card full" style="border-left: 4px solid var(--green);">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem;">
                 <div>
@@ -218,77 +206,51 @@
             <button onclick="saveToolsConfig()" class="btn-success" style="margin-top: 1rem;">💾 Save Diagnostic Settings</button>
         </div>
 
-        <!-- QUICK HOW-TO GUIDE -->
         <div class="card full" style="border-left: 4px solid var(--blue);">
             <h3>📖 Miko Music Quick-Start Guide</h3>
-            <span class="help-text">Click a section below for quick reference instructions.</span>
-
-            <div class="accordion-header" onclick="toggleAccordion('guide-macros')">
-                <span>1. Playlist Macros & Hot-Loading</span><span>▼</span>
-            </div>
-            <div id="guide-macros" class="accordion-body">
-                • <b>Assign Shortcodes:</b> In the Playlist Manager, add a clean name, a memorable shortcode (e.g., <code>fng</code> or <code>dtg</code>), and the playlist URL.<br>
-                • <b>Instant Queue:</b> Type just the shortcode in the Remote Play input or Discord <code>🔍 Add Song</code> modal to load all tracks.<br>
-                • <b>Source of Truth:</b> Playlists update live from Spotify or YouTube each time they are queued.
-            </div>
+            <span class="help-text">Click a section below for quick reference instructions. GitHub README has been similarly mapped.</span>
 
             <div class="accordion-header" onclick="toggleAccordion('guide-queue')">
-                <span>2. Live Queue & Reordering</span><span>▼</span>
+                <span>1. Queue Management & Live Playlist Syncing</span><span>▼</span>
             </div>
             <div id="guide-queue" class="accordion-body">
-                • <b>Drag & Drop:</b> Use the ☰ handle on any track to drag it up or down in the queue.<br>
-                • <b>Manual Move:</b> Type track # and destination # into the move boxes and click <b>Move</b>.<br>
-                • <b>Non-Destructive Stop:</b> Clicking <b>Clear Queue</b> halts playback and clears upcoming tracks without dropping the bot from the voice channel.
+                • <b>Searching & Removing:</b> Use the search bar above the queue to filter songs instantly. Click the <b>✕</b> to drop a track.<br>
+                • <b>Playlist Synchronicity:</b> Every time you queue a playlist URL or shortcode, the bot scrapes YouTube/Spotify in real-time. If you add songs to your actual Spotify playlist, they instantly appear the next time you load it in Miko.<br>
+                • <b>Non-Destructive Clear:</b> Clicking <b>Clear Queue</b> safely empties the tracks and pauses playback without dropping the bot from voice.
             </div>
 
             <div class="accordion-header" onclick="toggleAccordion('guide-channels')">
-                <span>3. Standby Banner & Channel Routing</span><span>▼</span>
+                <span>2. The Phantom Dashboard & Auto-Hiding Logs</span><span>▼</span>
             </div>
             <div id="guide-channels" class="accordion-body">
-                • <b>Dedicated Channel:</b> Lock control panels to a specific Discord channel in Channel Routing.<br>
-                • <b>Persistent Banner:</b> When queue finishes or disconnects, the summon banner regenerates at the bottom of the chat.<br>
-                • <b>Auto-Hide:</b> Check <b>Auto-Hide Discord Messages</b> to automatically purge Now Playing cards after 60s.
+                • <b>Persistent Panels:</b> The bot automatically sweeps the Control Panel channel to delete old panels and banners, ensuring your buttons always stay locked at the bottom of the chat.<br>
+                • <b>Self-Cleaning Replies:</b> "Only you can see this" messages are Discord-side Ephemerals. The bot cannot delete them, but they auto-hide forever when you close the app.<br>
+                • <b>Now Playing Logs:</b> Enable <b>Auto-Hide Discord Messages</b> to have the bot physically delete song notification logs after 60 seconds.
+            </div>
+
+            <div class="accordion-header" onclick="toggleAccordion('guide-sfx')">
+                <span>3. Architecture Note: Music vs Soundboards</span><span>▼</span>
+            </div>
+            <div id="guide-sfx" class="accordion-body">
+                • Discord physically prevents a single bot from playing two audio streams at the same time.<br>
+                • For overlapping D&D sound effects, the recommended architecture is deploying a secondary, lightweight sibling bot ("Miko SFX") that hosts an overlapping soundboard without interrupting Miko Music's engine.
             </div>
         </div>
     </div>
 
     <script>
-        let cachedPlaylists = [];
-        let isFirstLoad = true;
-        let draggedIndex = null;
-        let isMuted = false;
-        let preMuteVol = 100;
-        let currentQueueState = { current: null, tracks: [] };
+        let cachedPlaylists = [], isFirstLoad = true, draggedIndex = null, isMuted = false, preMuteVol = 100, currentQueueState = { current: null, tracks: [] };
 
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            document.querySelector(`.tab-btn[onclick="switchTab('${tabId}')"]`).classList.add('active');
-            document.getElementById(`tab-${tabId}`).classList.add('active');
-        }
-
-        function toggleAccordion(id) {
-            const body = document.getElementById(id);
-            body.classList.toggle('open');
-        }
-
+        function switchTab(id) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); document.querySelector(`.tab-btn[onclick="switchTab('${id}')"]`).classList.add('active'); document.getElementById(`tab-${id}`).classList.add('active'); }
+        function toggleAccordion(id) { document.getElementById(id).classList.toggle('open'); }
         function escapeHTML(str) { return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag])); }
 
         function loadConfig() {
-            fetch('/api/server-info').then(r => r.json()).then(data => {
-                document.getElementById('serverBadge').innerText = `📡 Active Server: ${data.serverName}`;
-            });
-
+            fetch('/api/server-info').then(r => r.json()).then(data => document.getElementById('serverBadge').innerText = `📡 Active Server: ${data.serverName}`);
             fetch('/api/channels').then(r => r.json()).then(channels => {
-                const panel = document.getElementById('panelChannelId');
-                const log = document.getElementById('logChannelId');
-                panel.innerHTML = '<option value="">-- No Restriction --</option>';
-                log.innerHTML = '<option value="">-- Do Not Send Logs --</option>';
-                channels.forEach(c => {
-                    panel.innerHTML += `<option value="${c.id}">#${c.name}</option>`;
-                    log.innerHTML += `<option value="${c.id}">#${c.name}</option>`;
-                });
-
+                const panel = document.getElementById('panelChannelId'), log = document.getElementById('logChannelId');
+                panel.innerHTML = '<option value="">-- No Restriction --</option>'; log.innerHTML = '<option value="">-- Do Not Send Logs --</option>';
+                channels.forEach(c => { panel.innerHTML += `<option value="${c.id}">#${c.name}</option>`; log.innerHTML += `<option value="${c.id}">#${c.name}</option>`; });
                 fetch('/api/config').then(r => r.json()).then(data => {
                     if (data.dashboardName) document.getElementById('dashTitle').innerText = data.dashboardName;
                     if (data.panelChannelId) panel.value = data.panelChannelId;
@@ -300,231 +262,92 @@
                     if (data.autoHideMessages) document.getElementById('autoHideMessages').checked = true;
                     if (data.spotifyClientId) document.getElementById('spotifyClientId').value = data.spotifyClientId;
                     if (data.spotifyClientSecret) document.getElementById('spotifyClientSecret').value = data.spotifyClientSecret;
-                    cachedPlaylists = data.savedPlaylists || [];
-                    renderPlaylists();
+                    cachedPlaylists = data.savedPlaylists || []; renderPlaylists();
                 });
             });
-
             fetch('/api/voice-channels').then(r => r.json()).then(channels => {
                 const vcSelect = document.getElementById('voiceChannelSelect');
                 vcSelect.innerHTML = '<option value="">-- Select Voice Channel --</option>';
-                channels.forEach(c => { vcSelect.innerHTML += `<option value="${c.id}">🔊 ${c.name}</option>`; });
+                channels.forEach(c => vcSelect.innerHTML += `<option value="${c.id}">🔊 ${c.name}</option>`);
             });
-            refreshQueue();
-            fetchLogs();
+            refreshQueue(); fetchLogs();
         }
 
-        function fetchLogs() {
-            fetch('/api/logs').then(r => r.json()).then(data => {
-                const box = document.getElementById('terminalBox');
-                box.innerText = data.logs || "Log file is empty.";
-                box.scrollTop = box.scrollHeight;
-            });
-        }
+        function fetchLogs() { fetch('/api/logs').then(r => r.json()).then(data => { const b = document.getElementById('terminalBox'); b.innerText = data.logs || "Log file empty."; b.scrollTop = b.scrollHeight; }); }
 
         function saveToolsConfig() {
-            fetch('/api/settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    logRetentionDays: parseInt(document.getElementById('logRetentionDays').value),
-                    logLevel: document.getElementById('logLevel').value,
-                    logDirectory: document.getElementById('logDirectory').value.trim(),
-                    logBackupSchedule: document.getElementById('logBackupSchedule').value,
-                    spotifyClientId: document.getElementById('spotifyClientId').value.trim(),
-                    spotifyClientSecret: document.getElementById('spotifyClientSecret').value.trim(),
-                    panelChannelId: document.getElementById('panelChannelId').value,
-                    logChannelId: document.getElementById('logChannelId').value,
-                    autoHideMessages: document.getElementById('autoHideMessages').checked
-                })
-            }).then(() => alert(`Tool settings saved successfully!`));
+            fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ 
+                logRetentionDays: parseInt(document.getElementById('logRetentionDays').value), logLevel: document.getElementById('logLevel').value,
+                logDirectory: document.getElementById('logDirectory').value.trim(), logBackupSchedule: document.getElementById('logBackupSchedule').value,
+                spotifyClientId: document.getElementById('spotifyClientId').value.trim(), spotifyClientSecret: document.getElementById('spotifyClientSecret').value.trim(),
+                panelChannelId: document.getElementById('panelChannelId').value, logChannelId: document.getElementById('logChannelId').value, autoHideMessages: document.getElementById('autoHideMessages').checked
+            })}).then(() => alert(`Tool settings saved successfully!`));
         }
 
-        function restartService() {
-            if (confirm("Restart the Miko Music Bot Windows Service now? Audio will disconnect for 5-10 seconds.")) {
-                fetch('/api/system/restart', { method: 'POST' }).then(() => {
-                    alert('Restart command issued. The dashboard will reconnect shortly.');
-                });
-            }
-        }
+        function restartService() { if (confirm("Restart the Miko Music Bot Windows Service now? Audio will disconnect for 5-10 seconds.")) fetch('/api/system/restart', { method: 'POST' }).then(() => alert('Restart command issued. The dashboard will reconnect shortly.')); }
 
         function refreshQueue() {
             fetch('/api/queue').then(r => r.json()).then(data => {
                 currentQueueState = data;
                 document.getElementById('activeNowPlaying').innerText = data.current ? `▶️ Now Playing: ${data.current}` : '▶️ Nothing Playing';
                 const qc = document.getElementById('queueContainer');
-
-                if (!data.tracks || !data.tracks.length) {
-                    qc.innerHTML = '<div style="color:#6c7086; padding:0.5rem; font-size:0.9rem;">Queue is empty.</div>';
-                } else {
+                if (!data.tracks || !data.tracks.length) qc.innerHTML = '<div style="color:#6c7086; padding:0.5rem; font-size:0.9rem;">Queue is empty.</div>';
+                else {
                     qc.innerHTML = data.tracks.map(t => `
                         <div class="queue-item" draggable="true" data-index="${t.index}">
-                            <span class="drag-handle">☰</span>
-                            <span style="font-weight: bold; width: 22px;">${t.index}.</span>
-                            <span class="queue-title">${escapeHTML(t.title)}</span>
-                        </div>
-                    `).join('');
-                    bindDragEvents();
+                            <span class="drag-handle">☰</span><span style="font-weight: bold; width: 22px;">${t.index}.</span><span class="queue-title">${escapeHTML(t.title)}</span>
+                            <button class="btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; margin-left: auto;" onclick="removeTrackApi(${t.index})">✕</button>
+                        </div>`).join('');
+                    bindDragEvents(); filterQueue();
                 }
-
-                if (isFirstLoad && data.volume !== undefined) {
-                    document.getElementById('volSlider').value = data.volume;
-                    document.getElementById('volLabel').innerText = data.volume;
-                    if (data.volume == 0) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; }
-                    isFirstLoad = false;
-                }
+                if (isFirstLoad && data.volume !== undefined) { document.getElementById('volSlider').value = data.volume; document.getElementById('volLabel').innerText = data.volume; if (data.volume == 0) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; } isFirstLoad = false; }
             });
+        }
+
+        function filterQueue() {
+            const q = document.getElementById('queueSearch').value.toLowerCase();
+            document.querySelectorAll('.queue-item').forEach(item => { const title = item.querySelector('.queue-title').innerText.toLowerCase(); item.style.display = title.includes(q) ? 'flex' : 'none'; });
         }
 
         function bindDragEvents() {
             const items = document.querySelectorAll('.queue-item');
             items.forEach(item => {
-                item.addEventListener('dragstart', (e) => {
-                    draggedIndex = parseInt(item.getAttribute('data-index'));
-                    item.classList.add('dragging');
-                    e.dataTransfer.effectAllowed = 'move';
-                });
+                item.addEventListener('dragstart', (e) => { draggedIndex = parseInt(item.getAttribute('data-index')); item.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
                 item.addEventListener('dragend', () => item.classList.remove('dragging'));
                 item.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
-                item.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    const targetIndex = parseInt(item.getAttribute('data-index'));
-                    if (draggedIndex && targetIndex && draggedIndex !== targetIndex) moveTrackApi(draggedIndex, targetIndex);
-                });
+                item.addEventListener('drop', (e) => { e.preventDefault(); const targetIndex = parseInt(item.getAttribute('data-index')); if (draggedIndex && targetIndex && draggedIndex !== targetIndex) moveTrackApi(draggedIndex, targetIndex); });
             });
         }
 
-        function moveTrackApi(from, to) {
-            fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move', from, to }) }).then(() => refreshQueue());
-        }
+        function removeTrackApi(index) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'remove', index }) }).then(() => refreshQueue()); }
+        function moveTrackApi(from, to) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move', from, to }) }).then(() => refreshQueue()); }
+        function manualMoveTrack() { const f = document.getElementById('moveFrom').value, t = document.getElementById('moveTo').value; if (!f || !t) return; moveTrackApi(parseInt(f), parseInt(t)); document.getElementById('moveFrom').value = ''; document.getElementById('moveTo').value = ''; }
 
-        function manualMoveTrack() {
-            const from = document.getElementById('moveFrom').value;
-            const to = document.getElementById('moveTo').value;
-            if (!from || !to) return;
-            moveTrackApi(parseInt(from), parseInt(to));
-            document.getElementById('moveFrom').value = '';
-            document.getElementById('moveTo').value = '';
-        }
+        setInterval(refreshQueue, 3500); setInterval(fetchLogs, 5000);
 
-        setInterval(refreshQueue, 3500);
-        setInterval(fetchLogs, 5000);
-
-        function editDashName() {
-            const newName = prompt("Enter new dashboard name:", document.getElementById('dashTitle').innerText);
-            if (newName && newName.trim() !== '') {
-                fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dashboardName: newName.trim() }) })
-                .then(() => document.getElementById('dashTitle').innerText = newName.trim());
-            }
-        }
-
-        function manageVoice(action) {
-            const channelId = document.getElementById('voiceChannelSelect').value;
-            fetch('/api/voice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, channelId }) })
-            .then(r => r.json()).then(res => { if(!res.success) alert(res.message); });
-        }
-
-        function toggleMute() {
-            const slider = document.getElementById('volSlider');
-            if (isMuted) {
-                isMuted = false;
-                slider.value = preMuteVol;
-                document.getElementById('muteToggleBtn').innerText = '🔊';
-            } else {
-                isMuted = true;
-                preMuteVol = slider.value == 0 ? 100 : slider.value;
-                slider.value = 0;
-                document.getElementById('muteToggleBtn').innerText = '🔇';
-            }
-            setVolume();
-        }
-
-        function setVolume() {
-            const vol = document.getElementById('volSlider').value;
-            document.getElementById('volLabel').innerText = vol;
-            if (vol > 0 && isMuted) { isMuted = false; document.getElementById('muteToggleBtn').innerText = '🔊'; }
-            else if (vol == 0 && !isMuted) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; }
-            fetch('/api/volume', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ volume: vol }) });
-        }
+        function editDashName() { const n = prompt("Enter new dashboard name:", document.getElementById('dashTitle').innerText); if (n && n.trim() !== '') fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dashboardName: n.trim() }) }).then(() => document.getElementById('dashTitle').innerText = n.trim()); }
+        function manageVoice(action) { const channelId = document.getElementById('voiceChannelSelect').value; fetch('/api/voice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, channelId }) }).then(r => r.json()).then(res => { if(!res.success) alert(res.message); }); }
+        
+        function toggleMute() { const s = document.getElementById('volSlider'); if (isMuted) { isMuted = false; s.value = preMuteVol; document.getElementById('muteToggleBtn').innerText = '🔊'; } else { isMuted = true; preMuteVol = s.value == 0 ? 100 : s.value; s.value = 0; document.getElementById('muteToggleBtn').innerText = '🔇'; } setVolume(); }
+        function setVolume() { const v = document.getElementById('volSlider').value; document.getElementById('volLabel').innerText = v; if (v > 0 && isMuted) { isMuted = false; document.getElementById('muteToggleBtn').innerText = '🔊'; } else if (v == 0 && !isMuted) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; } fetch('/api/volume', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ volume: v }) }); }
 
         async function remotePlay() {
-            const query = document.getElementById('remotePlayInput').value.trim();
-            if (!query) return;
-
-            // Detect if loading a playlist or macro
-            const cleanQuery = query.toLowerCase();
-            const isMacro = cachedPlaylists.some(pl => pl.shortcode && pl.shortcode.toLowerCase() === cleanQuery);
-            const isPlaylistUrl = query.includes('playlist') || query.includes('list=') || query.includes('/album/');
-
-            if ((isMacro || isPlaylistUrl) && (currentQueueState.current || currentQueueState.tracks.length > 0)) {
-                const choice = confirm("⚠️ Music is currently active!\n\nLoading a full playlist on top will append it. Click OK to clear the current queue first, or Cancel to abort.");
-                if (!choice) return;
-                
-                await fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop' }) });
-                await new Promise(r => setTimeout(r, 400));
+            const q = document.getElementById('remotePlayInput').value.trim(); if (!q) return;
+            const cq = q.toLowerCase(); const isM = cachedPlaylists.some(pl => pl.shortcode && pl.shortcode.toLowerCase() === cq); const isP = q.includes('playlist') || q.includes('list=') || q.includes('/album/');
+            if ((isM || isP) && (currentQueueState.current || currentQueueState.tracks.length > 0)) {
+                if (!confirm("⚠️ Music is currently active!\n\nLoading a full playlist on top will append it. Click OK to clear the current queue first, or Cancel to abort.")) return;
+                await fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop' }) }); await new Promise(r => setTimeout(r, 400));
             }
-
-            fetch('/api/play', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) })
-            .then(r => r.json()).then(res => {
-                if (!res.success) alert(res.message);
-                else { document.getElementById('remotePlayInput').value = ''; refreshQueue(); fetchLogs(); }
-            });
+            fetch('/api/play', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q }) }).then(r => r.json()).then(res => { if (!res.success) alert(res.message); else { document.getElementById('remotePlayInput').value = ''; refreshQueue(); fetchLogs(); } });
         }
 
-        function syncPlaylistsFromDOM() {
-            const synced = [];
-            for (let i = 0; i < cachedPlaylists.length; i++) {
-                const n = document.getElementById(`pl-name-${i}`)?.value ?? cachedPlaylists[i]?.name ?? '';
-                const c = document.getElementById(`pl-code-${i}`)?.value ?? cachedPlaylists[i]?.shortcode ?? '';
-                const u = document.getElementById(`pl-url-${i}`)?.value ?? cachedPlaylists[i]?.url ?? '';
-                synced.push({ name: n, shortcode: c, url: u });
-            }
-            cachedPlaylists = synced;
-        }
-
-        function renderPlaylists() {
-            const container = document.getElementById('plContainer');
-            container.innerHTML = '';
-            cachedPlaylists.forEach((pl, index) => {
-                container.innerHTML += `
-                    <div class="pl-item">
-                        <input type="text" value="${pl.name || ''}" id="pl-name-${index}" placeholder="Playlist Name" oninput="syncPlaylistsFromDOM()">
-                        <input type="text" value="${pl.shortcode || ''}" id="pl-code-${index}" placeholder="Shortcode" oninput="syncPlaylistsFromDOM()">
-                        <input type="text" value="${pl.url || ''}" id="pl-url-${index}" placeholder="URL" oninput="syncPlaylistsFromDOM()">
-                        <button class="btn-danger" onclick="removePlaylistRow(${index})">✕</button>
-                    </div>
-                `;
-            });
-        }
-
+        function syncPlaylistsFromDOM() { const s = []; for (let i = 0; i < cachedPlaylists.length; i++) { s.push({ name: document.getElementById(`pl-name-${i}`)?.value ?? cachedPlaylists[i]?.name ?? '', shortcode: document.getElementById(`pl-code-${i}`)?.value ?? cachedPlaylists[i]?.shortcode ?? '', url: document.getElementById(`pl-url-${i}`)?.value ?? cachedPlaylists[i]?.url ?? '' }); } cachedPlaylists = s; }
+        function renderPlaylists() { const c = document.getElementById('plContainer'); c.innerHTML = ''; cachedPlaylists.forEach((pl, i) => { c.innerHTML += `<div class="pl-item"><input type="text" value="${pl.name || ''}" id="pl-name-${i}" placeholder="Playlist Name" oninput="syncPlaylistsFromDOM()"><input type="text" value="${pl.shortcode || ''}" id="pl-code-${i}" placeholder="Shortcode" oninput="syncPlaylistsFromDOM()"><input type="text" value="${pl.url || ''}" id="pl-url-${i}" placeholder="URL" oninput="syncPlaylistsFromDOM()"><button class="btn-danger" onclick="removePlaylistRow(${i})">✕</button></div>`; }); }
         function addEmptyPlaylistRow() { syncPlaylistsFromDOM(); cachedPlaylists.push({ name: '', shortcode: '', url: '' }); renderPlaylists(); }
-        function removePlaylistRow(index) { syncPlaylistsFromDOM(); cachedPlaylists.splice(index, 1); renderPlaylists(); }
-
-        function savePlaylists() {
-            syncPlaylistsFromDOM();
-            const newPlaylists = [];
-            for (let i = 0; i < cachedPlaylists.length; i++) {
-                const n = cachedPlaylists[i].name?.trim();
-                const c = (cachedPlaylists[i].shortcode || '').toLowerCase().trim();
-                const u = cachedPlaylists[i].url?.trim();
-                if (n && u) newPlaylists.push({ name: n, shortcode: c, url: u });
-            }
-            fetch('/api/playlists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playlists: newPlaylists }) })
-            .then(() => { alert('Playlists saved successfully!'); loadConfig(); });
-        }
-
-        function openDiscordInvite() {
-            fetch('/api/config').then(r => r.json()).then(data => {
-                const id = data.clientId || prompt("Paste your Application ID:");
-                if (!id) return;
-                window.open(`https://discord.com/oauth2/authorize?client_id=${id}&permissions=3148800&scope=bot%20applications.commands`, 'popup', 'width=500,height=750');
-            });
-        }
-
-        function controlPlayer(action) {
-            fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
-            .then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); fetchLogs(); });
-        }
+        function removePlaylistRow(i) { syncPlaylistsFromDOM(); cachedPlaylists.splice(i, 1); renderPlaylists(); }
+        function savePlaylists() { syncPlaylistsFromDOM(); const np = []; for (let i = 0; i < cachedPlaylists.length; i++) { const n = cachedPlaylists[i].name?.trim(), c = (cachedPlaylists[i].shortcode || '').toLowerCase().trim(), u = cachedPlaylists[i].url?.trim(); if (n && u) np.push({ name: n, shortcode: c, url: u }); } fetch('/api/playlists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playlists: np }) }).then(() => { alert('Playlists saved successfully!'); loadConfig(); }); }
+        function openDiscordInvite() { fetch('/api/config').then(r => r.json()).then(data => { const id = data.clientId || prompt("Paste your Application ID:"); if (id) window.open(`https://discord.com/oauth2/authorize?client_id=${id}&permissions=3148800&scope=bot%20applications.commands`, 'popup', 'width=500,height=750'); }); }
+        function controlPlayer(action) { fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) }).then(r => r.json()).then(res => { if(!res.success) alert(res.message); refreshQueue(); fetchLogs(); }); }
 
         loadConfig();
     </script>
