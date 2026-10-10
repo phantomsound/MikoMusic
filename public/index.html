@@ -331,7 +331,17 @@
                         </div>`).join('');
                     bindDragEvents(); filterQueue();
                 }
-                if (isFirstLoad && data.volume !== undefined) { document.getElementById('volSlider').value = data.volume; document.getElementById('volLabel').innerText = data.volume; if (data.volume == 0) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; } isFirstLoad = false; }
+                                if (isFirstLoad && data.volume !== undefined) { 
+                    document.getElementById('volSlider').value = data.volume; 
+                    document.getElementById('volLabel').innerText = data.volume; 
+                    if (data.volume == 0) { isMuted = true; document.getElementById('muteToggleBtn').innerText = '🔇'; } 
+                    isFirstLoad = false; 
+                }
+                if (data.voiceChannelId && document.getElementById('voiceChannelSelect')) {
+                    if (document.getElementById('voiceChannelSelect').value !== data.voiceChannelId) {
+                        document.getElementById('voiceChannelSelect').value = data.voiceChannelId;
+                    }
+                }
             });
         }
 
@@ -424,3 +434,4 @@
     </script>
 </body>
 </html>
+

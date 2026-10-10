@@ -87,11 +87,23 @@ function startServer(client) {
         return client.player.nodes.cache.first();
     }
 
-    app.get('/api/queue', (req, res) => {
-        const queue = getTargetQueue(req.query.guildId);
-        if (!queue) return res.json({ current: null, tracks: [], volume: 100 });
+        app.get('/api/queue', (req, res) => {
+        const guildId = req.query.guildId;
+        const queue = guildId ? client.player.nodes.get(guildId) : client.player.nodes.cache.first();
+        const config = getConfig();
+        let vcId = null;
+        const targetGuild = guildId ? client.guilds.cache.get(guildId) : client.guilds.cache.first();
+        if (targetGuild) {
+            const member = targetGuild.members.cache.get(client.user.id);
+            if (member && member.voice.channelId) vcId = member.voice.channelId;
+        }
+        const finalVcId = vcId || config.lastVoiceChannelId || '';
+        const defVol = config.defaultVolume !== undefined ? config.defaultVolume : 100;
+        
+        if (!queue) return res.json({ current: null, tracks: [], volume: defVol, voiceChannelId: finalVcId });
+        
         const tracks = queue.tracks.toArray().map((t, i) => ({ title: t.title, author: t.author, duration: t.duration, url: t.url, index: i + 1 }));
-        res.json({ current: queue.currentTrack ? queue.currentTrack.title : null, tracks, volume: queue.node.volume });
+        res.json({ current: queue.currentTrack ? queue.currentTrack.title : null, tracks, volume: queue.node.volume, voiceChannelId: finalVcId });
     });
 
     app.post('/api/play', async (req, res) => {
@@ -158,9 +170,13 @@ function startServer(client) {
         } catch(e) { res.json({ success: false, message: e.message }); }
     });
 
-    app.post('/api/volume', (req, res) => {
-        const queue = getTargetQueue(req.body.guildId);
-        if (queue && req.body.volume !== undefined) queue.node.setVolume(parseInt(req.body.volume));
+        app.post('/api/volume', (req, res) => {
+        const queue = req.body.guildId ? client.player.nodes.get(req.body.guildId) : client.player.nodes.cache.first();
+        const vol = parseInt(req.body.volume);
+        if (queue && !isNaN(vol)) queue.node.setVolume(vol);
+        const config = getConfig();
+        config.defaultVolume = vol;
+        saveConfig(config);
         res.json({ success: true });
     });
 
@@ -179,7 +195,11 @@ function startServer(client) {
             const config = getConfig();
             const txt = config.panelChannelId ? vc.guild.channels.cache.get(config.panelChannelId) : vc.guild.channels.cache.filter(c=>c.isTextBased()).first();
             const queue = client.player.nodes.create(vc.guild, { metadata: { channel: txt, panelMessage: null }, leaveOnEmpty: false, leaveOnEnd: false, leaveOnStop: false, bufferingTimeout: 0 });
+                        const config = getConfig();
+            config.lastVoiceChannelId = channelId;
+            saveConfig(config);
             await queue.connect(vc);
+            if (config.defaultVolume !== undefined) queue.node.setVolume(config.defaultVolume);
             return res.json({ success: true });
         }
         res.json({ success: false });
@@ -209,3 +229,4 @@ function startServer(client) {
     app.listen(PORT, () => console.log(`🌐 Web UI running on port ${PORT}`));
 }
 module.exports = { startServer };
+

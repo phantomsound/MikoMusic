@@ -17,9 +17,20 @@
       "name": "After a Long Day of Work",
       "shortcode": "aaldow",
       "url": "https://music.youtube.com/playlist?list=PLGy6G8k8BIAQ&si=GwQ91uorXKLB0i7g"
+    },
+    {
+      "name": "Friday Night YouTube Gamers",
+      "shortcode": "ytfng",
+      "url": "https://music.youtube.com/playlist?list=PLPsyW1DuhtHE&si=qtJRNnDt8oMOT1NW"
     }
   ],
   "panelChannelId": "1557946904766058577",
   "logChannelId": "1557946871152906370",
-  "logRetentionDays": 7
+  "logRetentionDays": 7,
+  "autoHideMessages": true,
+  "spotifyClientId": "",
+  "spotifyClientSecret": "",
+  "logLevel": "normal",
+  "logDirectory": "C:\\Apps\\MikoDiscordMusicBot\\logs",
+  "logBackupSchedule": "daily"
 }
