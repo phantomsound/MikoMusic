@@ -7,7 +7,7 @@
     <style>
         :root { --bg: #1e1e2e; --card: #282a36; --card-alt: #313244; --input: #181825; --border: #45475a; --text: #cdd6f4; --blue: #89b4fa; --green: #a6e3a1; --red: #f38ba8; --yellow: #f9e2af; }
         * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; max-width: 1040px; margin: 0 auto; line-height: 1.4; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; max-width: 1100px; margin: 0 auto; line-height: 1.4; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
         .tab-nav { display: flex; gap: 10px; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
         .tab-btn { background: transparent; color: var(--text); border: none; padding: 0.6rem 1.2rem; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1.05rem; opacity: 0.6; transition: 0.2s; }
@@ -55,18 +55,18 @@
     <div class="header">
         <div>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <h1 id="dashTitle">Miko Music Dashboard</h1>
+                <h1 id="dashTitle" style="margin: 0;">Miko Music Dashboard</h1>
                 <button onclick="editDashName()" class="btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;">✏️ Rename</button>
             </div>
-            <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px; flex-wrap: wrap;">
+                <span id="statusBadge"><span style="color: var(--blue);">🔵 Connecting...</span></span>
                 <span style="color: var(--green); font-size: 0.88rem; font-weight: bold;">🖥️ Host: <span id="hostBadge">MIKOHOME</span></span>
                 <span style="font-size: 0.85rem; color: #a6adc8;">| Active Guild:</span>
                 <select id="guildSelector" onchange="switchGuildContext()" style="width: auto; padding: 2px 8px; font-size: 0.85rem;"></select>
-                <span id="botStatusBadge" style="font-size: 0.85rem; font-weight: bold;"></span>
             </div>
         </div>
         <div style="display: flex; gap: 8px;">
-            <button class="btn-secondary" onclick="window.open('http://localhost:3001', '_blank')">🎙️ Miko SFX Dashboard</button>
+            <button class="btn-secondary" onclick="window.open('http://localhost:3001', '_blank')">🎙️ Miko SFX</button>
             <button class="btn-success" onclick="openDiscordInvite()">➕ Invite Bot</button>
         </div>
     </div>
@@ -298,10 +298,10 @@
             apiFetch('/api/server-info').then(r => r.json()).then(data => {
                 document.getElementById('hostBadge').innerText = data.hostName;
                 document.getElementById('systemTimeLabel').innerText = data.systemTime;
-                const statusBadge = document.getElementById('botStatusBadge');
+                const statusBadge = document.getElementById('statusBadge') || document.getElementById('botStatusBadge');
                 if (statusBadge) {
                     if (data.status === 'online') {
-                        statusBadge.innerHTML = `<span style="color: var(--green);">🟢 Online (${data.botUser || 'Connected'})</span>`;
+                        statusBadge.innerHTML = `<span style="color: var(--green);" title="${escapeHTML(data.botUser ? 'Connected as ' + data.botUser : 'Online')}">🟢 Online</span>`;
                     } else if (data.status === 'rate_limited') {
                         const mins = Math.ceil((data.rateLimitRemaining || 0) / 60);
                         const hrs = (mins / 60).toFixed(1);
@@ -311,7 +311,7 @@
                     } else if (data.status === 'connecting') {
                         statusBadge.innerHTML = `<span style="color: var(--blue);">🔵 Connecting...</span>`;
                     } else {
-                        statusBadge.innerHTML = `<span style="color: var(--red);">🔴 Offline</span>`;
+                        statusBadge.innerHTML = `<span style="color: #6c7086;">⚪ Disconnected</span>`;
                     }
                 }
                 const gSelect = document.getElementById('guildSelector');
@@ -386,9 +386,9 @@
                 const currVal = vcSelect.value;
                 vcSelect.innerHTML = '<option value="auto">🎯 Auto-Detect (Join Where People Are)</option>';
                 channels.forEach(c => {
-                    const countTag = c.userCount > 0 ? ` (${c.userCount} active 👥)` : '';
-                    const defTag = c.isDefault ? ' ⭐ [Default]' : '';
-                    vcSelect.innerHTML += `<option value="${c.id}">${escapeHTML(c.name)}${countTag}${defTag}</option>`;
+                    const countLabel = c.userCount > 0 ? ` (${c.userCount} active)` : '';
+                    const defLabel = c.isDefault ? ' ⭐ Default' : '';
+                    vcSelect.innerHTML += `<option value="${c.id}">${escapeHTML(c.fullName || c.name)}${countLabel}${defLabel}</option>`;
                 });
                 if (currVal && Array.from(vcSelect.options).some(o => o.value === currVal)) {
                     vcSelect.value = currVal;
@@ -467,9 +467,9 @@
                 const vcStatus = document.getElementById('connectedVcStatus');
                 if (vcStatus) {
                     if (data.voiceChannelName) {
-                        vcStatus.innerHTML = `<span style="color: var(--green);">Connected: <b>🔊 ${escapeHTML(data.voiceChannelName)}</b></span>`;
+                        vcStatus.innerHTML = `<span style="color: var(--green);">🟢 Connected: <b>🔊 ${escapeHTML(data.voiceChannelName)}</b></span>`;
                     } else {
-                        vcStatus.innerHTML = `<span style="color: #a6adc8;">Not in voice channel</span>`;
+                        vcStatus.innerHTML = `<span style="color: #6c7086;">⚪ Disconnected</span>`;
                     }
                 }
 
@@ -510,7 +510,7 @@
                 if(!res.success) alert(res.message); 
                 else if (action === 'join' && res.channelName) {
                     const vcStatus = document.getElementById('connectedVcStatus');
-                    if (vcStatus) vcStatus.innerHTML = `<span style="color: var(--green);">Connected: <b>🔊 ${escapeHTML(res.channelName)}</b></span>`;
+                    if (vcStatus) vcStatus.innerHTML = `<span style="color: var(--green);">🟢 Connected: <b>🔊 ${escapeHTML(res.channelName)}</b></span>`;
                 }
                 refreshQueue(); 
             }); 
